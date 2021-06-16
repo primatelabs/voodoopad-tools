@@ -88,7 +88,7 @@ The DMK is fed through the HKDF-SHA-256 function to get a 512-bit DMK-SUBKEY.
 
 `DMK-SUBKEY = HKDF(MK, hkdf_salt, 'MK-SUBKEY', 64)`
 
-DMK-SUBKEY encrypts the Document Master Key (DMK).
+DMK-SUBKEY encrypts the Data Protection Key (DPK).
 
 
 ### VoodooPad document files
