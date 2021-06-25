@@ -23,6 +23,26 @@
 import sys
 
 import datastore
+import tokenizer
+
+# Map wiki words to page UUIDs and print the result
+def show_wikiwords(ds):
+  keywords = {}
+  for uuid in ds.item_uuids():
+    p = ds.item_path(uuid)
+    item = tokenizer.VPItem(uuid, p)
+ 
+    for word in item.item_keywords():
+      if word not in keywords:
+        keywords[word] = []
+        keywords[word].append(uuid)
+      else:
+        if uuid not in keywords[word]:
+          keywords[word].append(uuid)
+
+  for w in keywords:
+    print(w)
+    print(keywords[w])
 
 def main():
   ds = datastore.DataStore(sys.argv[1])
@@ -32,6 +52,7 @@ def main():
 
   print(ds.validate())
 
+  show_wikiwords(ds)
 
 if __name__ == '__main__':
   main()
