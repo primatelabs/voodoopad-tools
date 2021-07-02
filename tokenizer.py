@@ -26,7 +26,7 @@ class Tokenizer:
     self.idx = 0
 
   def is_break(self, c):
-    b = [' ', '\r', '\n', ';', ',']
+    b = [' ', '\r', '\n', ';', ',', '.']
 
     return c in b
  
@@ -72,7 +72,7 @@ def is_wikiword(word):
 
   # Must contain at least 1 lower-case chacter followed
   # by at least 1 upper-case character
-  has_lower = True
+  has_lower = False
   for i in range(1, len(word)):
     if word[i].islower():
       has_lower = True
