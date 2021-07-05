@@ -26,14 +26,19 @@ import datastore
 import tokenizer
 import sqlite3
 import os
+import uuid as UUID
+import plistlib
+from pathlib import Path
+import hashlib
 
 class VPCache:
-  def __init__(self):
-    self.db_path = 'cache.db'
+  def __init__(self, ds_path):
+    self.db_path = str(Path(ds_path, 'cache.db'))
     self.init_cache()
 
   def init_cache(self):
 
+    # If the file exists, assume the tables already exist
     if os.path.isfile(self.db_path):
       return
 
@@ -42,7 +47,7 @@ class VPCache:
     cur = con.cursor()
 
     # create table
-    cur.execute('''create table items(uuid text, key text, displayname text)''')
+    cur.execute('''create table items(uuid text, key text, displayname text, dataHash text)''')
     cur.execute('''create table refs(wikiword text, uuid text)''')
 
     con.commit()
@@ -63,8 +68,8 @@ class VPCache:
       plist = ds.item_plist(uuid)
       key = plist['key']
       displayname = plist['displayName']
-
-      cur.execute('insert into items values (?, ?, ?)', (uuid, key, displayname))
+      data_hash = plist['dataHash']
+      cur.execute('insert into items values (?, ?, ?, ?)', (uuid, key, displayname, data_hash))
 
     # Get wikiwords and uuids
     keywords = get_wikiword_map(ds)
@@ -73,6 +78,59 @@ class VPCache:
       for uuid in keywords[k]:
         cur.execute('insert into refs values(?, ?)', (k, uuid))
 
+    con.commit()
+
+
+  def update_cache(self, ds):
+    con = sqlite3.connect(self.db_path)
+
+    cur = con.cursor()
+
+    uuids = ds.item_uuids()
+
+    updated_items = []
+    new_items = []
+
+    # Go through the UUIDs and check if any are new or updated
+    for uuid in uuids:
+      item = ds.item_plist(uuid)
+      data_hash = item['dataHash']
+
+      cur.execute('select uuid, dataHash from items where uuid = ?', (uuid,))
+      row = cur.fetchone()
+
+      # This item does not exist. It is a new item.
+      if row == None:
+        new_items.append(uuid)
+        continue
+
+      # This item was updated
+      if row[1] != data_hash:
+        updated_items.append(uuid)
+
+    if len(updated_items) == 0 and len(new_items) == 0:
+      return
+
+    # Delete keywords for updated items.
+    for uuid in updated_items:
+      cur.execute('delete from refs where uuid = ?', (uuid,))
+
+    for uuid in updated_items:
+      keywords = get_wikiwords(ds, uuid)
+      for k in keywords:
+        cur.execute('insert into refs values(?, ?)', (k, uuid))
+
+    for uuid in new_items:
+      plist = ds.item_plist(uuid)
+      key = plist['key']
+      displayname = plist['displayName']
+      data_hash = plist['dataHash']
+      cur.execute('insert into items values (?, ?, ?, ?)', (uuid, key, displayname, data_hash))
+
+      keywords = get_wikiwords(ds, uuid)
+      for k in keywords:
+        cur.execute('insert into refs values(?, ?)', (k, uuid))
+  
     con.commit()
 
 
@@ -143,19 +201,32 @@ class VPCache:
 def get_wikiword_map(ds):
   keywords = {}
   for uuid in ds.item_uuids():
-    p = ds.item_path(uuid)
-    item = tokenizer.VPItem(uuid, p)
+    #p = ds.item_path(uuid)
  
-    # TODO: Is this the correct place to convert the wikiword to
-    # lowercase?
-    for word in item.item_keywords():
-      w = word.lower()
+    words = get_wikiwords(ds, uuid)
+
+    for w in words:
       if w not in keywords:
         keywords[w] = []
         keywords[w].append(uuid)
       else:
-        if uuid not in keywords[w]:
-          keywords[w].append(uuid)
+        keywords[w].append(uuid)
+
+  return keywords
+
+# Returns an array of wikiwords in the document
+def get_wikiwords(ds, uuid):
+  keywords = []
+  
+  p = ds.item_path(uuid)
+  item = tokenizer.VPItem(uuid, p)
+
+  # TODO: Is this the correct place to convert the wikiword to
+  # lowercase?
+  for word in item.item_keywords():
+    w = word.lower()
+    if w not in keywords:
+      keywords.append(w)
 
   return keywords
 
@@ -167,30 +238,81 @@ def show_wikiwords(ds):
     print(w)
     print(keywords[w])
 
+def sha1_hash(s):
+  sha1 = hashlib.sha1()
+  sha1.update(s.encode('utf-8'))
+  return sha1.hexdigest()
+
+
+def add_item(store_path, name, text):
+
+  item_uuid = str(UUID.uuid4())
+
+  item_path = Path(store_path, 'pages', item_uuid[0], item_uuid)
+  plist_path = Path(store_path, 'pages', item_uuid[0], item_uuid + '.plist')
+
+  item_key = name.lower()
+
+  data_hash = sha1_hash(text)
+ 
+  pl = dict(
+    uuid = item_uuid,
+    key = item_key,
+    displayName = name,
+    uti = 'public.utf8-plain-text',
+    dataHash = data_hash
+  )
+
+  with open(plist_path, 'wb') as fp:
+    plistlib.dump(pl, fp)
+
+  with open(item_path, 'wb') as fp:
+    fp.write(text.encode('utf-8'))
+
+
 def main():
+  cmd = ''
+
+  if len(sys.argv) < 1:
+    print('usage: voodoopad.py document [command]')
+    exit(1)
+  
+  if len(sys.argv) >= 3:
+    cmd = sys.argv[2]
+
   ds = datastore.DataStore(sys.argv[1])
-  print(ds.path)
-  print(ds.storeinfo)
-  print(ds.properties)
 
-  print(ds.validate())
+  if cmd == '':
+    print(ds.path)
+    print(ds.storeinfo)
+    print(ds.properties)
 
-  #show_wikiwords(ds)
-  print()
-  print()
-  print()
-  cache = VPCache()
-  cache.build_cache(ds)
+    print(ds.validate())
 
-  uuids = ds.item_uuids()
+    print()
+    print()
+    print()
+    cache = VPCache(sys.argv[1])
+    cache.update_cache(ds)
+    cache.dump_tables()
 
-  for uuid in uuids:
-    print(uuid, 'links to:')
-    print(cache.get_forwardlinks(uuid))
+    uuids = ds.item_uuids()
 
-  for uuid in uuids:
-    print(uuid, 'backlinks to:')
-    print(cache.get_backlinks(uuid))
+    for uuid in uuids:
+      print(uuid, 'links to:')
+      print(cache.get_forwardlinks(uuid))
+
+    for uuid in uuids:
+      print(uuid, 'backlinks to:')
+      print(cache.get_backlinks(uuid))
+  elif cmd == 'add':
+    text_file = sys.argv[3]
+    name = sys.argv[4]
+    with open(sys.argv[3], 'rb') as f:
+      text = f.read().decode('utf-8')
+      add_item(sys.argv[1], name, text)
+  else:
+    print('Unknown command')
 
 if __name__ == '__main__':
   main()
