@@ -214,12 +214,22 @@ def get_wikiword_map(ds):
 
   return keywords
 
+def get_page_names(ds):
+  names = []
+  for uuid in ds.item_uuids():
+    item = ds.item_plist(uuid)
+    names.append(item['displayName'])
+  
+  return names
+
 # Returns an array of wikiwords in the document
 def get_wikiwords(ds, uuid):
   keywords = []
-  
+
+  page_names = get_page_names(ds)
+
   p = ds.item_path(uuid)
-  item = tokenizer.VPItem(uuid, p)
+  item = tokenizer.VPItem(p, page_names)
 
   # TODO: Is this the correct place to convert the wikiword to
   # lowercase?
@@ -254,7 +264,7 @@ def add_item(store_path, name, text):
   item_key = name.lower()
 
   data_hash = sha1_hash(text)
- 
+
   pl = dict(
     uuid = item_uuid,
     key = item_key,
@@ -282,6 +292,7 @@ def main():
 
   ds = datastore.DataStore(sys.argv[1])
 
+  # Update the cache and dump information about the document
   if cmd == '':
 
     print(ds.path)
@@ -290,23 +301,24 @@ def main():
 
     print(ds.validate())
 
-    print()
-    print()
-    print()
     cache = VPCache(sys.argv[1])
     cache.update_cache(ds)
-    cache.dump_tables()
+
+    #cache.dump_tables()
 
     uuids = ds.item_uuids()
 
     for uuid in uuids:
-      print(uuid, 'links to:')
-      print(cache.get_forwardlinks(uuid))
+      print(ds.item_plist(uuid)['displayName'], 'links to:')
+      for id in cache.get_forwardlinks(uuid):
+        print(id, ds.item_plist(id)['displayName'])
 
     for uuid in uuids:
-      print(uuid, 'backlinks to:')
-      print(cache.get_backlinks(uuid))
+      print(ds.item_plist(uuid)['displayName'], ' backlinks to:')
+      for id in cache.get_backlinks(uuid):
+        print(id, ds.item_plist(id)['displayName'])
 
+  # Add a page to the document
   elif cmd == 'add':
 
     text_file = sys.argv[3]

@@ -20,7 +20,9 @@
 # FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 # DEALINGS IN THE SOFTWARE.
 
-class Tokenizer:
+import re
+
+class WikiWordTokenizer:
   def __init__(self, s):
     self.source = s
     self.idx = 0
@@ -87,28 +89,31 @@ def is_wikiword(word):
 
 
 class VPItem:
-  def __init__(self, uuid, path):
-    self.uuid = uuid
+  def __init__(self, path, page_names):
     self.path = path
-    self.wikiwords = []
+    self.tokens = []
+    self.page_names = page_names
 
     text = self.read_plaintext(self.path)
 
-    t = Tokenizer(text)
+    t = WikiWordTokenizer(text)
     
+    # Find wikiwords
     while True:
       word = t.next_token()
       if word == '':
         break
 
       if is_wikiword(word):
-        self.wikiwords.append(word)
+        self.tokens.append(word)
   
-  def item_uuid(self):
-    return self.uuid
-  
+    # Find page names
+    for page_name in page_names:
+      if re.search(page_name, text, re.IGNORECASE):
+        self.tokens.append(page_name)
+
   def item_keywords(self):
-    return self.wikiwords
+    return self.tokens
   
   def read_plaintext(self, path):
 
