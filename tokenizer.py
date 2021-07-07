@@ -29,7 +29,7 @@ class Tokenizer:
     b = [' ', '\r', '\n', ';', ',', '.']
 
     return c in b
- 
+
   # Returns the next token, or the empty string if there are no tokens
   # remaining
   def next_token(self):
@@ -66,6 +66,10 @@ class Tokenizer:
 
 def is_wikiword(word):
 
+  # Must be alphanumeric
+  if not word.isalnum():
+    return False
+
   # Must start with upper-case character
   if not word[0].isupper():
     return False
@@ -74,6 +78,7 @@ def is_wikiword(word):
   # by at least 1 upper-case character
   has_lower = False
   for i in range(1, len(word)):
+    
     if word[i].islower():
       has_lower = True
 
