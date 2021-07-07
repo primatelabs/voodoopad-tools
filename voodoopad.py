@@ -53,7 +53,7 @@ class VPCache:
     con.commit()
     con.close()
 
-
+  '''
   def build_cache(self, ds):
 
     con = sqlite3.connect(self.db_path)
@@ -79,7 +79,7 @@ class VPCache:
         cur.execute('insert into refs values(?, ?)', (k, uuid))
 
     con.commit()
-
+  '''
 
   def update_cache(self, ds):
     con = sqlite3.connect(self.db_path)
@@ -283,6 +283,7 @@ def main():
   ds = datastore.DataStore(sys.argv[1])
 
   if cmd == '':
+
     print(ds.path)
     print(ds.storeinfo)
     print(ds.properties)
@@ -305,13 +306,17 @@ def main():
     for uuid in uuids:
       print(uuid, 'backlinks to:')
       print(cache.get_backlinks(uuid))
+
   elif cmd == 'add':
+
     text_file = sys.argv[3]
     name = sys.argv[4]
     with open(sys.argv[3], 'rb') as f:
       text = f.read().decode('utf-8')
       add_item(sys.argv[1], name, text)
+
   else:
+
     print('Unknown command')
 
 if __name__ == '__main__':
