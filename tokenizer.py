@@ -22,49 +22,6 @@
 
 import re
 
-class WikiWordTokenizer:
-  def __init__(self, s):
-    self.source = s
-    self.idx = 0
-
-  def is_break(self, c):
-    b = [' ', '\r', '\n', ';', ',', '.']
-
-    return c in b
-
-  # Returns the next token, or the empty string if there are no tokens
-  # remaining
-  def next_token(self):
-    in_word = False
-    word_start = 0
-    word_len = 0
-
-    while True:
-
-      # At the end of the string?
-      if self.idx == len(self.source):
-        if in_word:
-          return self.source[word_start:word_start + word_len]
-        else:
-          return ''
-
-      # Encountered a separator?
-      if self.is_break(self.source[self.idx]):
-        if in_word:
-          return self.source[word_start:word_start + word_len]
-        else:
-          self.idx = self.idx + 1
-          continue
-
-      # Start of a word? 
-      if not in_word:
-        in_word = True
-        word_start = self.idx
-        word_len = 1
-      else:
-        word_len = word_len + 1
-      
-      self.idx = self.idx + 1
 
 def is_wikiword(word):
 
@@ -96,21 +53,23 @@ class VPItem:
 
     text = self.read_plaintext(self.path)
 
-    t = WikiWordTokenizer(text)
-    
-    # Find wikiwords
-    while True:
-      word = t.next_token()
-      if word == '':
-        break
+    words = re.split(r"[\s\r\n;,.()-]+", text)
 
+    # Find wikiwords
+    for word in words:
       if is_wikiword(word):
         self.tokens.append(word)
-  
+
     # Find page names
     for page_name in page_names:
       if re.search(page_name, text, re.IGNORECASE):
         self.tokens.append(page_name)
+
+    # Remove duplicates
+    self.tokens = list(set(self.tokens))
+
+    # Convert to lowercase
+    self.tokens = [x.lower() for x in self.tokens]
 
   def item_keywords(self):
     return self.tokens

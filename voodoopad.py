@@ -130,7 +130,7 @@ class VPCache:
       keywords = get_wikiwords(ds, uuid)
       for k in keywords:
         cur.execute('insert into refs values(?, ?)', (k, uuid))
-  
+
     con.commit()
 
 
@@ -231,14 +231,7 @@ def get_wikiwords(ds, uuid):
   p = ds.item_path(uuid)
   item = tokenizer.VPItem(p, page_names)
 
-  # TODO: Is this the correct place to convert the wikiword to
-  # lowercase?
-  for word in item.item_keywords():
-    w = word.lower()
-    if w not in keywords:
-      keywords.append(w)
-
-  return keywords
+  return item.item_keywords()
 
 # Map wiki words to page UUIDs and print the result
 def show_wikiwords(ds):
@@ -265,6 +258,7 @@ def add_item(store_path, name, text):
 
   data_hash = sha1_hash(text)
 
+  # TODO: Add all fields.
   pl = dict(
     uuid = item_uuid,
     key = item_key,
