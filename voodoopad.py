@@ -23,6 +23,7 @@
 import sys
 
 import datastore
+import enum
 import tokenizer
 import sqlite3
 import os
@@ -30,6 +31,10 @@ import uuid as UUID
 import plistlib
 from pathlib import Path
 import hashlib
+
+class PageFormat(enum.Enum):
+  Plaintext = 'public.utf8-plain-text'
+  MarkDown = 'net.daringfireball.markdown'
 
 class VPCache:
   def __init__(self, ds_path):
@@ -319,7 +324,7 @@ def render_document(ds, cache, output_dir):
 
 
 
-def add_item(store_path, name, text):
+def add_item(store_path, name, text, format=PageFormat.Plaintext):
 
   item_uuid = str(UUID.uuid4())
 
@@ -335,7 +340,7 @@ def add_item(store_path, name, text):
     uuid = item_uuid,
     key = item_key,
     displayName = name,
-    uti = 'public.utf8-plain-text',
+    uti = PageFormat,
     dataHash = data_hash
   )
 
@@ -387,9 +392,15 @@ def main():
 
   # Add a page to the document
   elif cmd == 'add':
-
+    ds = datastore.DataStore(sys.argv[1])
     text_file = sys.argv[3]
     name = sys.argv[4]
+
+    for item in ds.item_plists.values():
+      if item['displayName'].lower() == name.lower():
+        print('A page with that name already exists')
+        return
+
     with open(sys.argv[3], 'rb') as f:
       text = f.read().decode('utf-8')
       add_item(sys.argv[1], name, text)
