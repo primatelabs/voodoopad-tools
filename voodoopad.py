@@ -281,7 +281,7 @@ def markdown_link(text, url):
 
 
 # Convert the page to markdown
-def render_page(ds, cache, uuid):
+def render_page(ds, cache, uuid, output_dir):
 
   p = ds.item_path(uuid)
   plist = ds.item_plist(uuid)
@@ -310,7 +310,7 @@ def render_page(ds, cache, uuid):
       text = text[:idx] + markdown + text[idx + len(keyword):]
       idx = idx + len(markdown)
 
-  filename = '{0}.md'.format(display_name)
+  filename = output_dir + '/{0}.md'.format(display_name)
 
   with open(filename, 'w') as f:
     f.write(text)
@@ -318,9 +318,11 @@ def render_page(ds, cache, uuid):
 
 
 def render_document(ds, cache, output_dir):
-  
+
+  os.mkdir(output_dir)
+
   for uuid in ds.item_uuids():
-    render_page(ds, cache, uuid)
+    render_page(ds, cache, uuid, output_dir)
 
 
 
@@ -418,7 +420,8 @@ def main():
       add_item(sys.argv[1], name, text, format)
 
   elif cmd == 'render':
-    output_dir = 'output'
+    output_dir= sys.argv[3]
+
     cache = VPCache(sys.argv[1])
     cache.update_cache(ds)
     render_document(ds, cache, output_dir)
