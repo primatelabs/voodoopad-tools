@@ -7,6 +7,9 @@ def parse_link(markdown_link, start=0):
 
   if start == -1:
     start = 0
+
+  if start >= len(markdown_link):
+    return None
   
   if markdown_link[start] != '[':
     return None
@@ -33,6 +36,10 @@ def parse_link(markdown_link, start=0):
 
   # Assume no space between bracket and parenthesis
   if markdown_link[start + count + 1] != '(':
+    return None
+
+  # Assume link cannot be empty
+  if markdown_link[start + count + 2] == ')':
     return None
 
   # Ignore Wikipedia category links
@@ -215,6 +222,7 @@ def get_links(text):
       idx = idx + 1
 
   return urls
+
 
 def main():
 

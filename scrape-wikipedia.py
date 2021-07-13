@@ -2,13 +2,15 @@ import os
 import sys
 import wikilink
 import tempfile
-import urllib
+import urllib.parse
 
 def get_article_markdown(article_name):
 
+  converter_path = '/home/brichard/git/mediawiki-to-markdown/convert.php'
+
   file_name = wikilink.convert_link(article_name) + '.xml'
 
-  pwd = '/home/brichard/git/voodoopad-tools/'
+  pwd = os.getcwd() + '/'
   tmp_dir = pwd + 'tmp/'
 
   # The mediawiki to markdown script does not let us specify the output file name. It only lets us specify the
@@ -19,8 +21,8 @@ def get_article_markdown(article_name):
   url = 'en.wikipedia.org/wiki/Special:Export/{0}'.format(urllib.parse.quote(article_name))
 
   #os.system("wget en.wikipedia.org/wiki/Special:Export/{0} -O {1}".format(article_name, tmp_dir + file_name))
-  os.system("wget --max-redirect 3 {0} -O {1}".format(url, tmp_dir + file_name))
-  os.system('php /home/brichard/git/mediawiki-to-markdown/convert.php --filename={0} --format=markdown_strict --output={1}'.format(tmp_dir + file_name, md_dir.name))
+  os.system("wget --max-redirect 100 {0} -O {1}".format(url, tmp_dir + file_name))
+  os.system('php {0} --filename={1} --format=markdown_strict --output={2}'.format(converter_path, tmp_dir + file_name, md_dir.name))
 
   md_path = md_dir.name + '/' + os.listdir(md_dir.name)[0]
 
@@ -36,12 +38,22 @@ def get_article_markdown(article_name):
 
 def main():
   output_dir = 'wikipedia'
+  
+  if len(sys.argv) != 2:
+    print('Usage scrape-wikipedia.py <article>')
+    return
+ 
   article_name = sys.argv[1]
 
   os.system('mkdir -p {0}'.format(output_dir))
   os.system('mkdir -p tmp')
   
   article = get_article_markdown(article_name)
+
+  if article == None:
+    print('Could not find article for ', article_name)
+    return
+
   converted_article = wikilink.convert_article(article)
 
   file_name = output_dir + '/' + wikilink.convert_link(article_name) + '.md'
@@ -61,6 +73,7 @@ def main():
       article_text = get_article_markdown(article_name)
       if article_text == None:
         print('Error getting article for ', article_name)
+        continue
     except:
       continue
 
