@@ -32,7 +32,7 @@ import plistlib
 from pathlib import Path
 import hashlib
 
-class PageFormat(enum.Enum):
+class PageFormat:
   Plaintext = 'public.utf8-plain-text'
   MarkDown = 'net.daringfireball.markdown'
 
@@ -340,7 +340,7 @@ def add_item(store_path, name, text, format=PageFormat.Plaintext):
     uuid = item_uuid,
     key = item_key,
     displayName = name,
-    uti = PageFormat,
+    uti = format,
     dataHash = data_hash
   )
 
@@ -395,6 +395,18 @@ def main():
     ds = datastore.DataStore(sys.argv[1])
     text_file = sys.argv[3]
     name = sys.argv[4]
+    
+    format = 'plaintext'
+    if len(sys.argv) > 5:
+      format = sys.argv[5]
+
+    if format == 'plaintext':
+      format = PageFormat.Plaintext
+    elif format == 'markdown':
+      format = PageFormat.MarkDown
+    else:
+      print('Invalid format ', format)
+      return
 
     for item in ds.item_plists.values():
       if item['displayName'].lower() == name.lower():
@@ -403,7 +415,7 @@ def main():
 
     with open(sys.argv[3], 'rb') as f:
       text = f.read().decode('utf-8')
-      add_item(sys.argv[1], name, text)
+      add_item(sys.argv[1], name, text, format)
 
   elif cmd == 'render':
     output_dir = 'output'
