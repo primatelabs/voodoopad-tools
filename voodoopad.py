@@ -181,7 +181,32 @@ class VPCache:
  
     return links
 
+  # Get the keywords that appear in the document with the given UUID
+  def get_links(self, uuid):
+    
+    con = sqlite3.connect(self.db_path)
 
+    cur = con.cursor()
+    
+    # Get the keywords that are in this page 
+    cur.execute('select wikiword from refs where uuid = ?', (uuid,))
+
+    rows = cur.fetchall()
+
+    # Get the page that each keyword links to
+    links = {}
+    for r in rows:
+      word = r[0]
+      cur.execute('select uuid from items where key = ?', (word,))
+      tmp = cur.fetchone()
+      if tmp == None:
+        continue
+      links[word] = tmp[0]
+ 
+    return links
+
+
+  # Dump tables contents to stdout
   def dump_tables(self):
     con = sqlite3.connect(self.db_path)
 
@@ -201,7 +226,6 @@ class VPCache:
 def get_wikiword_map(ds):
   keywords = {}
   for uuid in ds.item_uuids():
-    #p = ds.item_path(uuid)
  
     words = get_wikiwords(ds, uuid)
 
@@ -224,7 +248,6 @@ def get_page_names(ds):
 
 # Returns an array of wikiwords in the document
 def get_wikiwords(ds, uuid):
-  keywords = []
 
   page_names = get_page_names(ds)
 
@@ -245,6 +268,55 @@ def sha1_hash(s):
   sha1 = hashlib.sha1()
   sha1.update(s.encode('utf-8'))
   return sha1.hexdigest()
+
+
+# Returns a markdown link with the given text and URL
+def markdown_link(text, url):
+  return '[{0}]({1})'.format(text, url)
+
+
+# Convert the page to markdown
+def render_page(ds, cache, uuid):
+
+  p = ds.item_path(uuid)
+  plist = ds.item_plist(uuid)
+
+  display_name = plist['displayName']
+
+  with open(p, 'rb') as f:
+    text = f.read().decode('utf-8')
+
+  links = cache.get_links(uuid)
+
+  # Replace keywords with markdown links
+  for keyword in links:
+    idx = 0
+
+    # Do not link this document to itself
+    if links[keyword] == uuid:
+      continue
+
+    while True:
+      idx = text.lower().find(keyword, idx)
+      if idx == -1:
+        break
+
+      markdown = markdown_link(keyword, keyword + '.md')
+      text = text[:idx] + markdown + text[idx + len(keyword):]
+      idx = idx + len(markdown)
+
+  filename = '{0}.md'.format(display_name)
+
+  with open(filename, 'w') as f:
+    f.write(text)
+
+
+
+def render_document(ds, cache, output_dir):
+  
+  for uuid in ds.item_uuids():
+    render_page(ds, cache, uuid)
+
 
 
 def add_item(store_path, name, text):
@@ -272,6 +344,7 @@ def add_item(store_path, name, text):
 
   with open(item_path, 'wb') as fp:
     fp.write(text.encode('utf-8'))
+
 
 
 def main():
@@ -320,6 +393,12 @@ def main():
     with open(sys.argv[3], 'rb') as f:
       text = f.read().decode('utf-8')
       add_item(sys.argv[1], name, text)
+
+  elif cmd == 'render':
+    output_dir = 'output'
+    cache = VPCache(sys.argv[1])
+    cache.update_cache(ds)
+    render_document(ds, cache, output_dir)
 
   else:
 
