@@ -43,6 +43,8 @@ def is_wikiword(word):
 
     if word[i].isupper() and has_lower:
       return True
+  
+  return False
 
 
 class VPItem:
@@ -60,10 +62,16 @@ class VPItem:
       if is_wikiword(word):
         self.tokens.append(word)
 
+    # Search for page names in this page. We are dong a 
+    # case-insensitive search so convert both page
+    # and names to lower-case
+    text_lower = text.lower()
+    names_lower = [x.lower() for x in page_names]
+
     # Find page names
-    for page_name in page_names:
-      if re.search(page_name, text, re.IGNORECASE):
-        self.tokens.append(page_name)
+    for i in range(len(page_names)):
+      if text_lower.find(names_lower[i]) != -1:
+        self.tokens.append(page_names[i])
 
     # Remove duplicates
     self.tokens = list(set(self.tokens))
