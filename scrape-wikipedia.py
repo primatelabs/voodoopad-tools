@@ -6,7 +6,7 @@ import urllib.parse
 
 def get_article_markdown(article_name):
 
-  converter_path = '/home/brichard/git/mediawiki-to-markdown/convert.php'
+  converter_path = '/Users/brichard/git/mediawiki-to-markdown/convert.php'
 
   file_name = wikilink.convert_link(article_name) + '.xml'
 
@@ -18,10 +18,9 @@ def get_article_markdown(article_name):
   # only file in the directory, we can read it back without knowing its name.
   md_dir = tempfile.TemporaryDirectory()
 
-  url = 'en.wikipedia.org/wiki/Special:Export/{0}'.format(urllib.parse.quote(article_name))
+  url = 'https://en.wikipedia.org/wiki/Special:Export/{0}'.format(urllib.parse.quote(article_name))
 
-  #os.system("wget en.wikipedia.org/wiki/Special:Export/{0} -O {1}".format(article_name, tmp_dir + file_name))
-  os.system("wget --max-redirect 100 {0} -O {1}".format(url, tmp_dir + file_name))
+  os.system("curl {0} --output {1}".format(url, tmp_dir + file_name))
   os.system('php {0} --filename={1} --format=markdown_strict --output={2}'.format(converter_path, tmp_dir + file_name, md_dir.name))
 
   md_path = md_dir.name + '/' + os.listdir(md_dir.name)[0]
