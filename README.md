@@ -17,7 +17,9 @@ Add a page
 `python3 voodoopad.py <document> add <file> <page name>`
 
 
-Export markdown - this will replace any WikiWords or document names with links to the associated document and save the markdown files to the specified directory.
+Export markdown
+
+Replaces any WikiWords or document names with links to the associated document and saves the markdown files to the specified directory.
 
 `python3 voodoopad.py <document> render <output directory>`
 
