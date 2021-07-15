@@ -6,7 +6,7 @@ import urllib.parse
 
 def get_article_markdown(article_name):
 
-  converter_path = '/Users/brichard/git/mediawiki-to-markdown/convert.php'
+  converter_path = '/home/brichard/git/mediawiki-to-markdown/convert.php'
 
   file_name = wikilink.convert_link(article_name) + '.xml'
 
@@ -78,6 +78,7 @@ def main():
 
     converted_article = wikilink.convert_article(article_text)
     file_name = output_dir + '/' + wikilink.convert_link(article_name) + '.md'
+
     with open(file_name, 'wt') as f:
       f.write(converted_article)
 

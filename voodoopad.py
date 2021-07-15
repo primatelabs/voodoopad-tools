@@ -58,34 +58,6 @@ class VPCache:
     con.commit()
     con.close()
 
-  '''
-  def build_cache(self, ds):
-
-    con = sqlite3.connect(self.db_path)
-
-    cur = con.cursor()
-
-    uuids = ds.item_uuids()
-
-    # Get UUID, key and display name
-    # TODO: This will fail if the UUID is an alias
-    for uuid in uuids:
-      plist = ds.item_plist(uuid)
-      key = plist['key']
-      displayname = plist['displayName']
-      data_hash = plist['dataHash']
-      cur.execute('insert into items values (?, ?, ?, ?)', (uuid, key, displayname, data_hash))
-
-    # Get wikiwords and uuids
-    keywords = get_wikiword_map(ds)
-
-    for k in keywords:
-      for uuid in keywords[k]:
-        cur.execute('insert into refs values(?, ?)', (k, uuid))
-
-    con.commit()
-  '''
-
   def update_cache(self, ds):
     con = sqlite3.connect(self.db_path)
 
@@ -279,7 +251,26 @@ def sha1_hash(s):
 def markdown_link(text, url):
   return '[{0}]({1})'.format(text, url)
 
+# Determines if an index is inside a markdown link
+def in_markdown_link(text, idx):
+  size = 64
 
+  left_paren = text.find('(', max(idx - size, 0), idx)
+  right_paren = text.find(')', idx, min(idx + size, len(text) - 1))
+ 
+  left_bracket = text.find('[', max(idx - size, 0), idx)
+  right_bracket = text.find(']', idx, min(idx + size, len(text) - 1))
+
+  if left_bracket != -1 and right_bracket != -1:
+    if text[right_bracket + 1] == '(':
+      return True
+
+  if left_paren != -1 and right_paren != -1:
+    if text[left_paren - 1] == ']':
+      return True
+
+  return False
+ 
 # Convert the page to markdown
 def render_page(ds, cache, uuid, output_dir):
 
@@ -301,15 +292,34 @@ def render_page(ds, cache, uuid, output_dir):
     if links[keyword] == uuid:
       continue
 
+    # Find the locations of the keyword
+    indexes = []
     while True:
       idx = text.lower().find(keyword, idx)
       if idx == -1:
         break
 
-      markdown = markdown_link(keyword, keyword + '.md')
-      text = text[:idx] + markdown + text[idx + len(keyword):]
-      idx = idx + len(markdown)
+      # Ignore if its part of a bigger word
+      if text[idx - 1] != ' ' or text[idx + len(keyword)] != ' ':
+        idx = idx + len(keyword)
+        continue
 
+      # Ignore if already inside a markdown link
+      if in_markdown_link(text, idx):
+        idx = idx + len(keyword)
+        continue
+
+      indexes.append(idx)
+      idx = idx + len(keyword)
+
+    offset = 0
+    for idx in indexes:
+      markdown = markdown_link(keyword, keyword + '.md')
+      text = text[:idx + offset] + markdown + text[idx + offset + len(keyword):]
+
+      # Take into account characters added or removed
+      offset = offset + len(markdown) - len(keyword)
+  
   filename = output_dir + '/{0}.md'.format(display_name)
 
   with open(filename, 'w') as f:
@@ -319,11 +329,11 @@ def render_page(ds, cache, uuid, output_dir):
 
 def render_document(ds, cache, output_dir):
 
-  os.mkdir(output_dir)
+  if not os.path.exists(output_dir):
+    os.mkdir(output_dir)
 
   for uuid in ds.item_uuids():
     render_page(ds, cache, uuid, output_dir)
-
 
 
 def add_item(store_path, name, text, format=PageFormat.Plaintext):
@@ -377,8 +387,6 @@ def main():
 
     cache = VPCache(sys.argv[1])
     cache.update_cache(ds)
-
-    #cache.dump_tables()
 
     uuids = ds.item_uuids()
 

@@ -123,16 +123,6 @@ def convert_link(text):
 
   return text
 
-'''
-def replace(text, start, s, repalce_with):
-
-  idx = text.find(s, start)
-
-  if idx == -1:
-    return text
-  
-  return text[:idx] + repalce_with + text[idx + len(s):]
-'''
 
 def parse_wikilink(text):
   text = text.replace('"wikilink"', '')
