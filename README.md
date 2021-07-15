@@ -17,7 +17,7 @@ Add a page
 `python3 voodoopad.py <document> add <file> <page name>`
 
 
-Export markdown - this will replace any WikiWords or document names with links to the associated document.
+Export markdown - this will replace any WikiWords or document names with links to the associated document and save the markdown files to the specified directory.
 
 `python3 voodoopad.py <document> render <output directory>`
 
@@ -27,6 +27,8 @@ Export markdown - this will replace any WikiWords or document names with links t
 Scrape wikipedia
 
 Requires MediaWiki to Markdown Converter available here [https://github.com/philipashlock/mediawiki-to-markdown](https://github.com/philipashlock/mediawiki-to-markdown)
+
+This will scrape the given Wikipedia page, and follow any links on it and scrape those pages aswell. Then it will convert the mediawiki content on those pages to markdown and save everything to the specified directory.
 
 `python3 scripts/scrape_wikipedia.py <article name> <output directory>`
 
