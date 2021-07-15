@@ -6,13 +6,14 @@
 
 Dump document
 
-Builds the cache (`cache.db` inside the document directory) and prints the forward and backward links
+Builds the cache (`cache.db` inside the document directory) and prints the forward and backward links.
 
 `python3 voodoopad.py <document>`
 
 
 Add a page
 
+Imports a text file into the VoodooPad document.
 
 `python3 voodoopad.py <document> add <file> <page name>`
 
@@ -49,6 +50,6 @@ Example:
 
 # TODO
 
--  Reading/writing of encrypted documents. Threre is code to decrypt documents but it is not hooked up yet
+-  Reading/writing of encrypted documents. Threre is code to decrypt documents but it is not hooked up yet.
 -  Create documents from scratch. Currently `voodoopad.py` only works on existing VoodooPad documents.
 -  Convert markdown to HTML
