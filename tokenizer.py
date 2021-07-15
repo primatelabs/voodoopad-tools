@@ -22,7 +22,6 @@
 
 import re
 
-
 def is_wikiword(word):
 
   # Must be alphanumeric

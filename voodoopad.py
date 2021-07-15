@@ -23,7 +23,6 @@
 import sys
 
 import datastore
-import enum
 import tokenizer
 import sqlite3
 import os
