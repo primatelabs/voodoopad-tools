@@ -435,7 +435,7 @@ def main():
         print('A page with that name already exists')
         return
 
-    with open(sys.argv[3], 'rb') as f:
+    with open(text_file, 'rb') as f:
       text = f.read().decode('utf-8')
       add_item(document_path, name, text, format)
 
