@@ -76,9 +76,6 @@ class VPItem:
     # Remove duplicates
     self.tokens = list(set(self.tokens))
 
-    # Convert to lowercase
-    self.tokens = [x.lower() for x in self.tokens]
-
   def item_keywords(self):
     return self.tokens
   

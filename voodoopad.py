@@ -53,7 +53,7 @@ class VPCache:
 
     # create table
     cur.execute('''create table items(uuid text, key text, displayname text, dataHash text)''')
-    cur.execute('''create table refs(wikiword text, uuid text)''')
+    cur.execute('''create table refs(wikiword text, uuid text, key text)''')
 
     con.commit()
     con.close()
@@ -95,7 +95,7 @@ class VPCache:
     for uuid in updated_items:
       keywords = get_wikiwords(ds, uuid)
       for k in keywords:
-        cur.execute('insert into refs values(?, ?)', (k, uuid))
+        cur.execute('insert into refs values(?, ?, ?)', (k, uuid, k.lower()))
 
     for uuid in new_items:
       plist = ds.item_plist(uuid)
@@ -106,7 +106,7 @@ class VPCache:
 
       keywords = get_wikiwords(ds, uuid)
       for k in keywords:
-        cur.execute('insert into refs values(?, ?)', (k, uuid))
+        cur.execute('insert into refs values(?, ?, ?)', (k, uuid, k.lower()))
 
     con.commit()
 
@@ -127,7 +127,7 @@ class VPCache:
 
     key = row[0]
 
-    rows = cur.execute("select uuid from refs where wikiword = '{0}'".format(key))
+    rows = cur.execute("select uuid from refs where key = '{0}'".format(key))
 
     links = []
     for r in rows:
@@ -141,7 +141,7 @@ class VPCache:
     cur = con.cursor()
 
     # Get keywords inside this document
-    cur.execute('select wikiword from refs where uuid = ?', (uuid,))
+    cur.execute('select key from refs where uuid = ?', (uuid,))
 
     rows = cur.fetchall()
 
@@ -149,8 +149,8 @@ class VPCache:
     links = []
 
     for r in rows:
-      word = r[0]
-      cur.execute('select uuid from items where key = ? and uuid != ?', (word, uuid))
+      key = r[0]
+      cur.execute('select uuid from items where key = ? and uuid != ?', (key, uuid))
       tmp = cur.fetchone()
       if tmp == None:
         continue
@@ -164,25 +164,17 @@ class VPCache:
     con = sqlite3.connect(self.db_path)
 
     cur = con.cursor()
-    
-    # Get the keywords that are in this page 
-    cur.execute('select wikiword from refs where uuid = ?', (uuid,))
-
+ 
+    cur.execute('select key, wikiword from refs where uuid = ?', (uuid,))
     rows = cur.fetchall()
 
-    # Get the page that each keyword links to
     links = {}
     for r in rows:
-      word = r[0]
-      cur.execute('select uuid from items where key = ?', (word,))
-      tmp = cur.fetchone()
-      if tmp == None:
-        continue
-      links[word] = tmp[0]
- 
+      key = r[0]
+      word = r[1]
+      links[key] = word
+
     return links
-
-
   # Dump tables contents to stdout
   def dump_tables(self):
     con = sqlite3.connect(self.db_path)
@@ -278,48 +270,64 @@ def render_page(ds, cache, uuid, output_dir):
   plist = ds.item_plist(uuid)
 
   display_name = plist['displayName']
+  page_key = plist['key']
 
   with open(p, 'rb') as f:
     text = f.read().decode('utf-8')
 
   links = cache.get_links(uuid)
 
+  if display_name == 'test3':
+    print(display_name)
+
   # Replace keywords with markdown links
-  for keyword in links:
+  for key in links:
     idx = 0
 
     # Do not link this document to itself
-    if links[keyword] == uuid:
+    if key == page_key:
       continue
-
+    
     # Find the locations of the keyword
     indexes = []
     while True:
-      idx = text.lower().find(keyword, idx)
+      idx = text.lower().find(key, idx)
       if idx == -1:
         break
 
-      # Ignore if its part of a bigger word
-      if text[idx - 1] != ' ' or text[idx + len(keyword)] != ' ':
-        idx = idx + len(keyword)
+      # If the word is inside a markdown link and its the only thing in the link, then we
+      # want to replace the link target with the file name e.g. [Napoleon](Napoleon) becomes
+      # [Napoleon](Napoleon.md)
+      if text[idx - 1] == '(' and text[idx + len(key)] == ')' and text[idx - 2] == ']':
+        indexes.append(idx)
+
+      # Ignore if its part of a bigger word but accept if its surrounded by punctuation
+      # TODO: Is there a better way to do this?
+      if text[idx - 1] not in [' ','\n', '\r'] or text[idx + len(key)] not in [' ', '.', ',','\n', '\r']:
+        idx = idx + len(key)
         continue
 
       # Ignore if already inside a markdown link
       if in_markdown_link(text, idx):
-        idx = idx + len(keyword)
+        idx = idx + len(key)
         continue
 
       indexes.append(idx)
-      idx = idx + len(keyword)
+      idx = idx + len(key)
 
     offset = 0
     for idx in indexes:
-      markdown = markdown_link(keyword, keyword + '.md')
-      text = text[:idx + offset] + markdown + text[idx + offset + len(keyword):]
 
-      # Take into account characters added or removed
-      offset = offset + len(markdown) - len(keyword)
-  
+      if text[idx + offset - 1] == '(' and text[idx + offset + len(key)] == ')' and text[idx + offset - 2] == ']':
+        replacement = links[key] + '.md'
+        text = text[:idx + offset] + links[key] + '.md' + text[idx + offset + len(key):]
+        offset = offset + len(replacement) - len(key)
+      else:
+        word = text[idx + offset:idx + offset + len(key)]
+        markdown = markdown_link(word, links[key] + '.md')
+        text = text[:idx + offset] + markdown + text[idx + offset + len(key):]
+        offset = offset + len(markdown) - len(key)
+
   filename = output_dir + '/{0}.md'.format(display_name)
 
   with open(filename, 'w') as f:
