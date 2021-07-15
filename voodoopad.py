@@ -272,13 +272,12 @@ def render_page(ds, cache, uuid, output_dir):
   display_name = plist['displayName']
   page_key = plist['key']
 
+  print(display_name + '.md')
+
   with open(p, 'rb') as f:
     text = f.read().decode('utf-8')
 
   links = cache.get_links(uuid)
-
-  if display_name == 'test3':
-    print(display_name)
 
   # Replace keywords with markdown links
   for key in links:
@@ -375,14 +374,16 @@ def add_item(store_path, name, text, format=PageFormat.Plaintext):
 def main():
   cmd = ''
 
-  if len(sys.argv) < 1:
-    print('usage: voodoopad.py document [command]')
-    exit(1)
+  if len(sys.argv) <= 1:
+    print('usage: voodoopad.py <document> <command>')
+    return
   
+  document_path = sys.argv[1]
+
   if len(sys.argv) >= 3:
     cmd = sys.argv[2]
 
-  ds = datastore.DataStore(sys.argv[1])
+  ds = datastore.DataStore(document_path)
 
   # Update the cache and dump information about the document
   if cmd == '':
@@ -393,7 +394,7 @@ def main():
 
     print(ds.validate())
 
-    cache = VPCache(sys.argv[1])
+    cache = VPCache(document_path)
     cache.update_cache(ds)
 
     uuids = ds.item_uuids()
@@ -410,7 +411,11 @@ def main():
 
   # Add a page to the document
   elif cmd == 'add':
-    ds = datastore.DataStore(sys.argv[1])
+    if len(sys.argv) != 5:
+      print('Usage: <document name> add <file> <page name>')
+      return
+
+    ds = datastore.DataStore(document_path)
     text_file = sys.argv[3]
     name = sys.argv[4]
     
@@ -433,9 +438,13 @@ def main():
 
     with open(sys.argv[3], 'rb') as f:
       text = f.read().decode('utf-8')
-      add_item(sys.argv[1], name, text, format)
+      add_item(document_path, name, text, format)
 
   elif cmd == 'render':
+    if len(sys.argv) != 4:
+      print('Usage: <document name> render <output directory>')
+      return
+
     output_dir= sys.argv[3]
 
     cache = VPCache(sys.argv[1])
