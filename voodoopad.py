@@ -410,14 +410,14 @@ def main():
 
   # Add a page to the document
   elif cmd == 'add':
-    if len(sys.argv) != 5:
-      print('Usage: <document name> add <file> <page name>')
+    if len(sys.argv) != 5 and len(sys.argv) != 6:
+      print('Usage: <document name> add <file> <page name> <format>')
       return
 
     ds = datastore.DataStore(document_path)
     text_file = sys.argv[3]
     name = sys.argv[4]
-    
+
     format = 'plaintext'
     if len(sys.argv) > 5:
       format = sys.argv[5]
