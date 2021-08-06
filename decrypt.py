@@ -31,6 +31,7 @@ import hashlib
 import hmac
 from math import ceil
 import secrets
+import uuid
 
 from Crypto.Cipher import AES
 
@@ -218,115 +219,138 @@ def read_header(f):
 
   return header
 
+class VPEncryptionContext:
+
+  def load(self, doc_path, password):
+    self.doc_path = doc_path
+
+    vde = plistlib.load(open(Path(doc_path, 'vde.plist'), 'rb'), fmt=plistlib.FMT_XML)
+    hkdf_salt = vde['kdf']['hkdf_salt']
+    pbkdf_salt = vde['kdf']['pbkdf2_salt']
+    pbkdf_iterations = vde['kdf']['pbkdf2_iterations']
+
+    aes_key, hmac_key = derive_keys(password, pbkdf_salt, hkdf_salt, pbkdf_iterations)
+
+    self.hkdf_salt = hkdf_salt
+    self.pbkdf_salt = pbkdf_salt
+    self.pbkdf_iterations = pbkdf_iterations
+    self.aes_key = aes_key
+    self.hmac_key = hmac_key
 
 
-# Loads an encrypted file from the filesystem, decrypts it using the
-# supplied password and returns a byte array of the unencrypted
-# contents
-def load_encrypted_file(password, file_path):
+  def create(self, doc_path, password):
+    self.doc_path = doc_path
 
-  f = open(file_path, 'rb')
+    pbkdf_salt = secrets.token_bytes(32)
+    hkdf_salt = secrets.token_bytes(32)
+    pbkdf_iterations = 40000
 
-  # Check for magic number 'vpvde'
-  magic_number = f.read(5)
-  if (magic_number != b'vpvde'):
-    raise Exception('Not an encrypted file')
+    aes_key, hmac_key = derive_keys(password, pbkdf_salt, hkdf_salt, pbkdf_iterations)
 
-  header = read_header(f)
+    self.hkdf_salt = hkdf_salt
+    self.pbkdf_salt = pbkdf_salt
+    self.pbkdf_iterations = pbkdf_iterations
+    self.aes_key = aes_key
+    self.hmac_key = hmac_key
 
-  # Load encrypted payload
-  f.seek(header.payload_offset)
-  encrypted_payload = f.read(header.payload_length)
+    # Create vde.plist
+    vde = {}
+    vde['kdf'] = {}
+    vde['compat_version'] = 1
+    vde['feature_version'] = 1
+    vde['kdf']['hkdf_salt'] = hkdf_salt
+    vde['kdf']['pbkdf2_salt'] = pbkdf_salt
+    vde['kdf']['pbkdf2_iterations'] = pbkdf_iterations
 
-  # Load encrypted key data
-  f.seek(header.vde_offset)
-  vde_bytes = f.read(header.vde_length)
- 
-  vde = VDESession()
-  vde.parse(vde_bytes)
+    f = open(Path(doc_path, 'vde.plist'), 'wb')
+    plistlib.dump(vde, f)
 
-  # Derive keys from password
-  aes_key, hmac_key = derive_keys(password, vde.pbkdf_salt, vde.hkdf_salt, vde.pbkdf_iterations)
+    # Create storeinfo.plist
+    encrypted_store_info = {}
+    encrypted_store_info['uuid'] = str(uuid.uuid4)
 
-  payload_enc_key, payload_hmac_key = unwrap_keys(aes_key, hmac_key, vde.dpk)
+    data = self.encrypt_data(plistlib.dumps(encrypted_store_info))
 
-  decrypted_payload = aead_decrypt(payload_enc_key, payload_hmac_key, encrypted_payload)
+    store_info = {}
+    store_info['VoodooPadBundleVersion'] = 6
+    store_info['VoodooPadEncryptedStoreInfo'] = data
+    store_info['isEncrypted'] = True
 
-  return decrypted_payload
-
-
-def save_encrypted_file(password, file_path, data):
-
-  f = open(file_path, 'wb')
-
-  payload_enc_key = secrets.token_bytes(32)
-  payload_hmac_key = secrets.token_bytes(32)
-  
-  
-  # Derive keys from password. These will wrap our payload keys
-  pbkdf_salt = secrets.token_bytes(32)
-  hkdf_salt = secrets.token_bytes(32)
-  pbkdf_iterations = 40000
-
-  aes_key, hmac_key = derive_keys(password, pbkdf_salt, hkdf_salt, pbkdf_iterations)
-
-  # Encrypt the data
-  encrypted_payload = aead_encrypt(payload_enc_key, payload_hmac_key, data)
-
-  # Wrap the keys we just used
-  wrapped_keys = wrap_keys(aes_key, hmac_key, payload_enc_key, payload_hmac_key)
-
-  # Create VDE session object
-  vde_session = VDESession()
-  vde_session.create(pbkdf_iterations, pbkdf_salt, hkdf_salt, wrapped_keys)
-  vde_session_bytes = vde_session.serialize()
-
-  # Create VDE header
-  vde_header = VDEHeader()
-  vde_header.create(len(encrypted_payload), len(vde_session_bytes))
-  vde_header_bytes = vde_header.serialize()
-
-  # Write everything to file
-  f.write(vde_header_bytes)
-  f.write(encrypted_payload)
-  f.write(vde_session_bytes)
-
-# Same a load_encrypted_file except the file contents are passed as a byte
-# array
-def decrypt_data(password, data):
-
-  # Check for magic number 'vpvde'
-  magic_number = data[0:5]
-  if (magic_number != b'vpvde'):
-    raise Exception('Not an encrypted file')
-
-  header = VDEHeader()
-  header.parse(data)
-
-  # Load encrypted payload
-  encrypted_payload = data[header.payload_offset:header.payload_offset + header.payload_length]
-
-  # Load encrypted key data
-  vde_bytes = data[header.vde_offset:header.vde_offset + header.vde_length]
-  vde = VDESession()
-  vde.parse(vde_bytes)
-
-  #Derive keys from password
-  aes_key, hmac_key = derive_keys(password, vde.pbkdf_salt, vde.hkdf_salt, vde.pbkdf_iterations)
-
-  payload_enc_key, payload_hmac_key = unwrap_keys(aes_key, hmac_key, vde.dpk)
-
-  decrypted_payload = aead_decrypt(payload_enc_key, payload_hmac_key, encrypted_payload)
-
-  return decrypted_payload
+    plistlib.dump(store_info, open(Path(doc_path, 'storeinfo.plist'), 'wb'))
 
 
+  def load_file(self, file_path):
+    
+    f = open(Path(self.doc_path, file_path), 'rb')
 
-# Loads an encrypted plist document. Returns the plist object.
-def load_encrypted_plist(password, file_path):
-  data = load_encrypted_file(password, file_path)
+    data = f.read()
+    f.close()
 
-  return plistlib.loads(data, fmt=plistlib.FMT_XML)
+    return self.decrypt_data(data)
+
+
+  def load_plist(self, file_path):
+    data = self.load_file(file_path)
+
+    return plistlib.loads(data, fmt=plistlib.FMT_XML)
+
+
+  def save_file(self, file_path, payload):
+    
+    encrypted_data = self.encrypt_data(payload)
+    print(len(encrypted_data))
+    f = open(Path(self.doc_path, file_path), 'wb')
+    f.write(encrypted_data)
+    f.close()
+
+
+  def decrypt_data(self, data):
+
+    # Check for magic number 'vpvde'
+    magic_number = data[0:5]
+    if (magic_number != b'vpvde'):
+      raise Exception('Not an encrypted file')
+
+    header = VDEHeader()
+    header.parse(data)
+
+    # Load encrypted payload
+    encrypted_payload = data[header.payload_offset:header.payload_offset + header.payload_length]
+
+    # Load encrypted key data
+    vde_bytes = data[header.vde_offset:header.vde_offset + header.vde_length]
+    vde = VDESession()
+    vde.parse(vde_bytes)
+
+    payload_enc_key, payload_hmac_key = unwrap_keys(self.aes_key, self.hmac_key, vde.dpk)
+
+    return aead_decrypt(payload_enc_key, payload_hmac_key, encrypted_payload)
+
+
+  def encrypt_data(self, payload):
+
+    # Generate random keys to encrypt the file
+    payload_enc_key = secrets.token_bytes(32)
+    payload_hmac_key = secrets.token_bytes(32)
+
+    # Encrypt the data
+    encrypted_payload = aead_encrypt(payload_enc_key, payload_hmac_key, payload)
+
+    # Wrap the keys we just used
+    wrapped_keys = wrap_keys(self.aes_key, self.hmac_key, payload_enc_key, payload_hmac_key)
+
+    # Create VDE session object
+    vde_session = VDESession()
+    vde_session.create(self.pbkdf_iterations, self.pbkdf_salt, self.hkdf_salt, wrapped_keys)
+    vde_session_bytes = vde_session.serialize()
+
+    # Create VDE header
+    vde_header = VDEHeader()
+    vde_header.create(len(encrypted_payload), len(vde_session_bytes))
+    vde_header_bytes = vde_header.serialize()
+
+    return vde_header_bytes + encrypted_payload + vde_session_bytes
+
 
 def main():
 
@@ -336,46 +360,25 @@ def main():
 
   password = sys.argv[1]
   vp_path = sys.argv[2]
-  
-  # Decrypt and display storeinfo.plist
-  path = Path(Path(), vp_path, 'storeinfo.plist')
 
-  storeinfo = plistlib.load(open(path, 'rb'), fmt=plistlib.FMT_XML)
+  #path = Path(Path(), vp_path, 'vde.plist')
+  ctx = VPEncryptionContext()
+  ctx.load(vp_path, password)
 
-  encrypted = storeinfo['VoodooPadEncryptedStoreInfo']
-  decrypted = decrypt_data(password, encrypted)
-  print(decrypted)
-
-  # Decrypt and display tags.plist
-  path = Path(Path(), vp_path, 'tags.plist')
-  tags = load_encrypted_plist(password, path)
-  print(tags)
-  
-  path = Path(Path(), vp_path, 'vde.plist')
-  vde = plistlib.load(open(path, 'rb'), fmt=plistlib.FMT_XML)
-  print(vde)
-  kdf_salt = vde['kdf']['hkdf_salt']
-  print(kdf_salt.hex())
-
-  pbkdf_salt = vde['kdf']['pbkdf2_salt']
-  iterations = vde['kdf']['pbkdf2_iterations']
+  tags = ctx.load_plist('tags.plist')
 
   items_path = Path(vp_path, 'pages')
   items_plist_paths = items_path.rglob('*.plist')
   for items_plist_path in items_plist_paths:
     print(items_plist_path)
-    info = load_encrypted_file(password, items_plist_path)
+    item_path = os.path.relpath(items_plist_path, vp_path)
+    data_path = os.path.splitext(item_path)[0]
+
+    info = ctx.load_plist(item_path)
     print(info)
-    data_path = os.path.splitext(items_plist_path)[0]
-    print(data_path)
-    data = load_encrypted_file(password, data_path)
+    data = ctx.load_file(data_path)
     print(data)
 
-  test_data = b'This is just a test'
-
-  save_encrypted_file(password, 'test.bin', test_data)
-
-  test_data_decrypted = load_encrypted_file(password, 'test.bin')
 
 if __name__ == '__main__':
   main()
