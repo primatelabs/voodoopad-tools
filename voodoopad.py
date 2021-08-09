@@ -347,22 +347,46 @@ def add_item(ds, name, text, format=PageFormat.Plaintext):
   ds.add_item(name, text, format)
 
 
+def usage():
+  print('voodoopad.py [options] <document> <command>')
+  print('voodoopad.py [options] <document name> add <file> <page name> <format>')
+  print('voodoopad.py [options] <document name> render <output directory>')
+  print('') 
+  print('Options:')
+  print('--password <password>')
+
 def main():
   cmd = ''
 
-  if len(sys.argv) <= 1:
-    print('usage: voodoopad.py <document> <command>')
+  args = sys.argv
+  password = None
+
+  # Parse out --password <password>
+  for i in range(0, len(args)):
+    if args[i] == '--password':
+      if i + 1 == len(args):
+        print('--password requires an argument')
+        return
+      
+      # Get the password and delete these two arguments
+      password = args[i + 1]
+      del args[i]
+      del args[i]
+      break
+
+  if len(args) <= 1:
+    usage()
     return
   
-  document_path = sys.argv[1]
+  document_path = args[1]
 
-  if len(sys.argv) >= 3:
-    cmd = sys.argv[2]
+  if len(args) >= 3:
+    cmd = args[2]
 
-  ds = datastore.DataStore(document_path, 'password')
 
   # Update the cache and dump information about the document
   if cmd == '':
+    ds = datastore.DataStore(document_path, password)
 
     print(ds.path)
     print(ds.storeinfo)
@@ -387,16 +411,18 @@ def main():
 
   # Add a page to the document
   elif cmd == 'add':
-    if len(sys.argv) != 5 and len(sys.argv) != 6:
-      print('Usage: <document name> add <file> <page name> <format>')
+    if len(args) != 5 and len(args) != 6:
+      usage()
       return
+    
+    ds = datastore.DataStore(document_path, password)
 
-    text_file = sys.argv[3]
-    name = sys.argv[4]
+    text_file = args[3]
+    name = args[4]
 
     format = 'plaintext'
-    if len(sys.argv) > 5:
-      format = sys.argv[5]
+    if len(args) > 5:
+      format = args[5]
 
     if format == 'plaintext':
       format = PageFormat.Plaintext
@@ -416,19 +442,23 @@ def main():
       add_item(ds, name, text, format)
 
   elif cmd == 'render':
-    if len(sys.argv) != 4:
-      print('Usage: <document name> render <output directory>')
+    if len(args) != 4:
+      usage()
       return
+    
+    ds = datastore.DataStore(document_path, password)
 
-    output_dir= sys.argv[3]
+    output_dir= args[3]
 
-    cache = VPCache(sys.argv[1])
+    cache = VPCache(args[1])
     cache.update_cache(ds)
     render_document(ds, cache, output_dir)
 
   else:
 
-    print('Unknown command')
+    print('Unknown command', cmd)
+    print('')
+    usage()
 
 if __name__ == '__main__':
   main()
