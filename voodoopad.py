@@ -266,15 +266,15 @@ def in_markdown_link(text, idx):
 def render_page(ds, cache, uuid, output_dir):
 
   p = ds.item_path(uuid)
-  plist = ds.item_plist(uuid)
+
+  plist = ds.read_plist(uuid)
 
   display_name = plist['displayName']
   page_key = plist['key']
 
   print(display_name + '.md')
 
-  with open(p, 'rb') as f:
-    text = f.read().decode('utf-8')
+  text = ds.read_item(uuid)
 
   links = cache.get_links(uuid)
 
@@ -342,32 +342,9 @@ def render_document(ds, cache, output_dir):
     render_page(ds, cache, uuid, output_dir)
 
 
-def add_item(store_path, name, text, format=PageFormat.Plaintext):
+def add_item(ds, name, text, format=PageFormat.Plaintext):
 
-  item_uuid = str(UUID.uuid4())
-
-  item_path = Path(store_path, 'pages', item_uuid[0], item_uuid)
-  plist_path = Path(store_path, 'pages', item_uuid[0], item_uuid + '.plist')
-
-  item_key = name.lower()
-
-  data_hash = sha1_hash(text)
-
-  # TODO: Add all fields.
-  pl = dict(
-    uuid = item_uuid,
-    key = item_key,
-    displayName = name,
-    uti = format,
-    dataHash = data_hash
-  )
-
-  with open(plist_path, 'wb') as fp:
-    plistlib.dump(pl, fp)
-
-  with open(item_path, 'wb') as fp:
-    fp.write(text.encode('utf-8'))
-
+  ds.add_item(name, text, format)
 
 
 def main():
@@ -437,7 +414,7 @@ def main():
 
     with open(text_file, 'rb') as f:
       text = f.read().decode('utf-8')
-      add_item(document_path, name, text, format)
+      add_item(ds, name, text, format)
 
   elif cmd == 'render':
     if len(sys.argv) != 4:

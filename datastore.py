@@ -22,9 +22,16 @@
 
 import errno
 import glob
+import hashlib
 import os
 from pathlib import Path
 import plistlib
+import uuid as UUID
+
+def sha1_hash(s):
+  sha1 = hashlib.sha1()
+  sha1.update(s.encode('utf-8'))
+  return sha1.hexdigest()
 
 class DataStore:
   def __init__(self, path):
@@ -108,3 +115,39 @@ class DataStore:
     # TODO: Check that alias targets exist.
 
     return valid
+  
+  def add_item(self, name, text, format):
+    item_uuid = str(UUID.uuid4())
+    item_key = name.lower()
+
+    data_hash = sha1_hash(text)
+
+    # TODO: Add all fields.
+    pl = dict(
+      uuid = item_uuid,
+      key = item_key,
+      displayName = name,
+      uti = format,
+      dataHash = data_hash
+    )
+
+    item_path = Path(self.path, 'pages', item_uuid[0], item_uuid)
+    plist_path = Path(self.path, 'pages', item_uuid[0], item_uuid + '.plist')
+
+    with open(plist_path, 'wb') as fp:
+      plistlib.dump(pl, fp)
+    
+    with open(item_path, 'wb') as fp:
+      fp.write(text.encode('utf-8'))
+
+  def read_item(self, uuid):
+    p = self.item_path(uuid)
+
+    with open(p, 'rb') as f:
+      text = f.read().decode('utf-8')
+    
+    return text
+  
+  def read_plist(self, uuid):
+    return self.item_plist(uuid)
+
