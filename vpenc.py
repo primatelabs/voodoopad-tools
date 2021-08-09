@@ -279,7 +279,7 @@ class VPEncryptionContext:
 
   def load_file(self, file_path):
     
-    f = open(Path(self.doc_path, file_path), 'rb')
+    f = open(Path(file_path), 'rb')
 
     data = f.read()
     f.close()
@@ -292,12 +292,14 @@ class VPEncryptionContext:
 
     return plistlib.loads(data, fmt=plistlib.FMT_XML)
 
+  def save_plist(self, plist, plist_path):
+    serial = plistlib.dumps(plist, fmt=plistlib.FMT_XML)
+    self.save_file(plist_path, serial)
 
   def save_file(self, file_path, payload):
     
     encrypted_data = self.encrypt_data(payload)
-    print(len(encrypted_data))
-    f = open(Path(self.doc_path, file_path), 'wb')
+    f = open(file_path, 'wb')
     f.write(encrypted_data)
     f.close()
 

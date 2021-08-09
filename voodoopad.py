@@ -219,8 +219,8 @@ def get_wikiwords(ds, uuid):
 
   page_names = get_page_names(ds)
 
-  p = ds.item_path(uuid)
-  item = tokenizer.VPItem(p, page_names)
+  text = ds.item(uuid)
+  item = tokenizer.VPItem(text, page_names)
 
   return item.item_keywords()
 
@@ -267,14 +267,14 @@ def render_page(ds, cache, uuid, output_dir):
 
   p = ds.item_path(uuid)
 
-  plist = ds.read_plist(uuid)
+  plist = ds.item_plist(uuid)
 
   display_name = plist['displayName']
   page_key = plist['key']
 
   print(display_name + '.md')
 
-  text = ds.read_item(uuid)
+  text = ds.item(uuid)
 
   links = cache.get_links(uuid)
 
@@ -359,7 +359,7 @@ def main():
   if len(sys.argv) >= 3:
     cmd = sys.argv[2]
 
-  ds = datastore.DataStore(document_path)
+  ds = datastore.DataStore(document_path, 'password')
 
   # Update the cache and dump information about the document
   if cmd == '':
@@ -391,7 +391,6 @@ def main():
       print('Usage: <document name> add <file> <page name> <format>')
       return
 
-    ds = datastore.DataStore(document_path)
     text_file = sys.argv[3]
     name = sys.argv[4]
 

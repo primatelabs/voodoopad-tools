@@ -47,12 +47,9 @@ def is_wikiword(word):
 
 
 class VPItem:
-  def __init__(self, path, page_names):
-    self.path = path
+  def __init__(self, text, page_names):
     self.tokens = []
     self.page_names = page_names
-
-    text = self.read_plaintext(self.path)
 
     words = re.split(r"[\s\r\n;,.()-]+", text)
 
