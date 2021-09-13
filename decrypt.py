@@ -39,31 +39,31 @@ from Crypto.Cipher import AES
 
 def main():
 
-  if len(sys.argv) != 3:
-    print('Usage: <password> <encrypted VP document>')
-    return
+    if len(sys.argv) != 3:
+        print('Usage: <password> <encrypted VP document>')
+        return
 
-  password = sys.argv[1]
-  vp_path = sys.argv[2]
+    password = sys.argv[1]
+    vp_path = sys.argv[2]
 
-  #path = Path(Path(), vp_path, 'vde.plist')
-  ctx = vpenc.VPEncryptionContext()
-  ctx.load(vp_path, password)
+    #path = Path(Path(), vp_path, 'vde.plist')
+    ctx = vpenc.VPEncryptionContext()
+    ctx.load(vp_path, password)
 
-  tags = ctx.load_plist('tags.plist')
+    tags = ctx.load_plist('tags.plist')
 
-  items_path = Path(vp_path, 'pages')
-  items_plist_paths = items_path.rglob('*.plist')
-  for items_plist_path in items_plist_paths:
-    print(items_plist_path)
-    item_path = os.path.relpath(items_plist_path, vp_path)
-    data_path = os.path.splitext(item_path)[0]
+    items_path = Path(vp_path, 'pages')
+    items_plist_paths = items_path.rglob('*.plist')
+    for items_plist_path in items_plist_paths:
+        print(items_plist_path)
+        item_path = os.path.relpath(items_plist_path, vp_path)
+        data_path = os.path.splitext(item_path)[0]
 
-    info = ctx.load_plist(item_path)
-    print(info)
-    data = ctx.load_file(data_path)
-    print(data)
+        info = ctx.load_plist(item_path)
+        print(info)
+        data = ctx.load_file(data_path)
+        print(data)
 
 
 if __name__ == '__main__':
-  main()
+    main()

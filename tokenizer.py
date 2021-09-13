@@ -24,64 +24,64 @@ import re
 
 def is_wikiword(word):
 
-  # Must be alphanumeric
-  if not word.isalnum():
+    # Must be alphanumeric
+    if not word.isalnum():
+        return False
+
+    # Must start with upper-case character
+    if not word[0].isupper():
+        return False
+
+    # Must contain at least 1 lower-case chacter followed
+    # by at least 1 upper-case character
+    has_lower = False
+    for i in range(1, len(word)):
+
+        if word[i].islower():
+            has_lower = True
+
+        if word[i].isupper() and has_lower:
+            return True
+
     return False
-
-  # Must start with upper-case character
-  if not word[0].isupper():
-    return False
-
-  # Must contain at least 1 lower-case chacter followed
-  # by at least 1 upper-case character
-  has_lower = False
-  for i in range(1, len(word)):
-    
-    if word[i].islower():
-      has_lower = True
-
-    if word[i].isupper() and has_lower:
-      return True
-  
-  return False
 
 
 class VPItem:
-  def __init__(self, text, page_names):
-    self.tokens = []
-    self.page_names = page_names
+    def __init__(self, text, page_names):
+        self.tokens = []
+        self.page_names = page_names
 
-    words = re.split(r"[\s\r\n;,.()-]+", text)
+        words = re.split(r"[\s\r\n;,.()-]+", text)
 
-    # Find wikiwords
-    for word in words:
-      if is_wikiword(word):
-        self.tokens.append(word)
+        # Find wikiwords
+        for word in words:
+            if is_wikiword(word):
+                self.tokens.append(word)
 
-    # Search for page names in this page. We are dong a 
-    # case-insensitive search so convert both page
-    # and names to lower-case
-    text_lower = text.lower()
-    names_lower = [x.lower() for x in page_names]
+        # Search for page names in this page. We are dong a
+        # case-insensitive search so convert both page
+        # and names to lower-case
+        text_lower = text.lower()
+        names_lower = [x.lower() for x in page_names]
 
-    # Find page names
-    for i in range(len(page_names)):
-      if text_lower.find(names_lower[i]) != -1:
-        self.tokens.append(page_names[i])
+        # Find page names
+        for i in range(len(page_names)):
+            if text_lower.find(names_lower[i]) != -1:
+                self.tokens.append(page_names[i])
 
-    # Remove duplicates
-    self.tokens = list(set(self.tokens))
+        # Remove duplicates
+        self.tokens = list(set(self.tokens))
 
-  def item_keywords(self):
-    return self.tokens
-  
-  def read_plaintext(self, path):
+    def item_keywords(self):
+        return self.tokens
 
-    try:
-      f = open(path, 'r')
-      s = f.read()
-    except UnicodeDecodeError as e:
-      print('Warning: ', self.uuid, 'is not UTF-8')
-      s = ''
+    def read_plaintext(self, path):
 
-    return s
+        try:
+            f = open(path, 'r')
+            s = f.read()
+        except UnicodeDecodeError as e:
+            print('Warning: ', self.uuid, 'is not UTF-8')
+            s = ''
+
+        return s

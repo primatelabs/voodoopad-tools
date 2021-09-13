@@ -30,153 +30,153 @@ import uuid as UUID
 import vpenc
 
 def sha1_hash(s):
-  sha1 = hashlib.sha1()
-  sha1.update(s.encode('utf-8'))
-  return sha1.hexdigest()
+    sha1 = hashlib.sha1()
+    sha1.update(s.encode('utf-8'))
+    return sha1.hexdigest()
 
 class DataStore:
-  def __init__(self, path, password=None):
-    self.path = Path(path)
-    self.encrypted = False
-    self.enc_ctx = None
-    self.password = password
+    def __init__(self, path, password=None):
+        self.path = Path(path)
+        self.encrypted = False
+        self.enc_ctx = None
+        self.password = password
 
-    storeinfo_path = Path(self.path, 'storeinfo.plist')
-    if not storeinfo_path.exists():
-      # FIXME: Raise an error that indicates the vpdoc is invalid or corrupt.
-      raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), storeinfo_path)
+        storeinfo_path = Path(self.path, 'storeinfo.plist')
+        if not storeinfo_path.exists():
+            # FIXME: Raise an error that indicates the vpdoc is invalid or corrupt.
+            raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), storeinfo_path)
 
-    properties_path = Path(self.path, 'properties.plist')
-    if not properties_path.exists():
-      # FIXME: Raise an error that indicates the vpdoc is invalid or corrupt.
-      raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), properties_path)
+        properties_path = Path(self.path, 'properties.plist')
+        if not properties_path.exists():
+            # FIXME: Raise an error that indicates the vpdoc is invalid or corrupt.
+            raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), properties_path)
 
-    self.storeinfo = plistlib.load(open(storeinfo_path, 'rb'), fmt=plistlib.FMT_XML)
+        self.storeinfo = plistlib.load(open(storeinfo_path, 'rb'), fmt=plistlib.FMT_XML)
 
-    if self.storeinfo['isEncrypted']:
-      if self.password == None:
-        raise Exception('Password is required for encrypted document')
-      self.encrypted = True
-      self.enc_ctx = vpenc.VPEncryptionContext()
-      self.enc_ctx.load(self.path, self.password)
- 
-    if self.storeinfo['VoodooPadBundleVersion'] != 6:
-      raise Exception('Unsupported')
+        if self.storeinfo['isEncrypted']:
+            if self.password == None:
+                raise Exception('Password is required for encrypted document')
+            self.encrypted = True
+            self.enc_ctx = vpenc.VPEncryptionContext()
+            self.enc_ctx.load(self.path, self.password)
 
-    self.properties = self.load_plist(properties_path)
+        if self.storeinfo['VoodooPadBundleVersion'] != 6:
+            raise Exception('Unsupported')
 
-    items_path = Path(self.path, 'pages')
-    if not items_path.is_dir():
-      # FIXME: Raise an error that indicates the vpdoc is invalid or corrupt.
-      raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), properties_path)
+        self.properties = self.load_plist(properties_path)
 
-    self.item_plists = {}
-    item_plist_paths  = items_path.rglob('*.plist')
-    for item_plist_path in item_plist_paths:
-      item_uuid = item_plist_path.stem
-      item_plist = self.load_plist(item_plist_path)
-      self.item_plists[item_uuid] = item_plist
+        items_path = Path(self.path, 'pages')
+        if not items_path.is_dir():
+            # FIXME: Raise an error that indicates the vpdoc is invalid or corrupt.
+            raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), properties_path)
 
-    self.items = {}
-    for item_uuid in self.item_plists.keys():
-      item_plist = self.item_plist(item_uuid)
+        self.item_plists = {}
+        item_plist_paths  = items_path.rglob('*.plist')
+        for item_plist_path in item_plist_paths:
+            item_uuid = item_plist_path.stem
+            item_plist = self.load_plist(item_plist_path)
+            self.item_plists[item_uuid] = item_plist
 
-      # If the current item is an alias, then there is no file associated with
-      # it.  Skip it and move on to the next item.
-      if item_plist['uti'] in ['com.fm.page-alias']:
-        continue
+        self.items = {}
+        for item_uuid in self.item_plists.keys():
+            item_plist = self.item_plist(item_uuid)
 
-      item_path = self.item_path(item_uuid)
+            # If the current item is an alias, then there is no file associated with
+            # it.  Skip it and move on to the next item.
+            if item_plist['uti'] in ['com.fm.page-alias']:
+                continue
 
-      if not item_path.exists():
-        # FIXME: Raise an error that indicates the vpdoc is invalid or corrupt.
-        raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), item_path)
-      self.items[item_uuid] = self.load_file(item_path).decode('utf-8')
+            item_path = self.item_path(item_uuid)
 
-  def item_uuids(self):
-    return self.item_plists.keys()
+            if not item_path.exists():
+                # FIXME: Raise an error that indicates the vpdoc is invalid or corrupt.
+                raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), item_path)
+            self.items[item_uuid] = self.load_file(item_path).decode('utf-8')
 
-  def item(self, uuid):
-    # TODO: Should item() return the underlying item (e.g., if the uuid is an
-    # alias) or should it return something else?
-    return self.items[uuid]
+    def item_uuids(self):
+        return self.item_plists.keys()
 
-  def item_plist(self, uuid):
-    return self.item_plists[uuid]
+    def item(self, uuid):
+        # TODO: Should item() return the underlying item (e.g., if the uuid is an
+        # alias) or should it return something else?
+        return self.items[uuid]
 
-  def item_path(self, uuid):
-    return Path(self.path, 'pages', uuid[0], uuid)
+    def item_plist(self, uuid):
+        return self.item_plists[uuid]
 
-  def item_plist_path(self, uuid):
-    return Path(self.path, 'pages', uuid[0], '{}.plist'.format(uuid))
+    def item_path(self, uuid):
+        return Path(self.path, 'pages', uuid[0], uuid)
 
-  def validate(self):
-    valid = True
+    def item_plist_path(self, uuid):
+        return Path(self.path, 'pages', uuid[0], '{}.plist'.format(uuid))
 
-    # Validate that the UUIDs match the UUIDs stored in the property lists.
-    for item_uuid in self.item_uuids():
-      item_plist = self.item_plist(item_uuid)
-      if item_uuid != item_plist['uuid']:
-        valid = False
-        print('[WARN] UUID mismatch for {}'.format(item_uuid))
+    def validate(self):
+        valid = True
 
-    # TODO: Check the default item exists.
+        # Validate that the UUIDs match the UUIDs stored in the property lists.
+        for item_uuid in self.item_uuids():
+            item_plist = self.item_plist(item_uuid)
+            if item_uuid != item_plist['uuid']:
+                valid = False
+                print('[WARN] UUID mismatch for {}'.format(item_uuid))
 
-    # TODO: Check the expected item count matches the actual item count.
+        # TODO: Check the default item exists.
 
-    # TODO: Check that alias targets exist.
+        # TODO: Check the expected item count matches the actual item count.
 
-    return valid
-  
-  def add_item(self, name, text, format):
-    item_uuid = str(UUID.uuid4())
-    item_key = name.lower()
+        # TODO: Check that alias targets exist.
 
-    data_hash = sha1_hash(text)
+        return valid
 
-    # TODO: Add all fields.
-    pl = dict(
-      uuid = item_uuid,
-      key = item_key,
-      displayName = name,
-      uti = format,
-      dataHash = data_hash
-    )
+    def add_item(self, name, text, format):
+        item_uuid = str(UUID.uuid4())
+        item_key = name.lower()
 
-    item_path = Path(self.path, 'pages', item_uuid[0], item_uuid)
-    plist_path = Path(self.path, 'pages', item_uuid[0], item_uuid + '.plist')
+        data_hash = sha1_hash(text)
 
-    # Save to disk
-    self.save_plist(pl, plist_path)
-    self.save_file(text.encode('utf-8'), item_path)
+        # TODO: Add all fields.
+        pl = dict(
+          uuid = item_uuid,
+          key = item_key,
+          displayName = name,
+          uti = format,
+          dataHash = data_hash
+        )
 
-    # Keep in memory
-    self.items[item_uuid] = text
-    self.item_plists[item_uuid] = pl
+        item_path = Path(self.path, 'pages', item_uuid[0], item_uuid)
+        plist_path = Path(self.path, 'pages', item_uuid[0], item_uuid + '.plist')
+
+        # Save to disk
+        self.save_plist(pl, plist_path)
+        self.save_file(text.encode('utf-8'), item_path)
+
+        # Keep in memory
+        self.items[item_uuid] = text
+        self.item_plists[item_uuid] = pl
 
 
-  def load_plist(self, path):
-    if self.encrypted:
-      return self.enc_ctx.load_plist(path)
-    else:
-      return plistlib.load(open(path, 'rb'), fmt=plistlib.FMT_XML)
+    def load_plist(self, path):
+        if self.encrypted:
+            return self.enc_ctx.load_plist(path)
+        else:
+            return plistlib.load(open(path, 'rb'), fmt=plistlib.FMT_XML)
 
-  def save_plist(self, plist, path):
-    if self.encrypted:
-      return self.enc_ctx.save_plist(plist, path)
-    else:
-      with open(path, 'wb') as fp:
-        plistlib.dump(plist, fp)
+    def save_plist(self, plist, path):
+        if self.encrypted:
+            return self.enc_ctx.save_plist(plist, path)
+        else:
+            with open(path, 'wb') as fp:
+                plistlib.dump(plist, fp)
 
-  def load_file(self, path):
-    if self.encrypted:
-      return self.enc_ctx.load_file(path)
-    else:
-      return open(path, 'rb').read()
-  
-  def save_file(self, data, path):
-    if self.encrypted:
-      self.enc_ctx.save_file(path, data)
-    else:
-      with open(path, 'wb') as fp:
-        fp.write(data.encode('utf-8'))
+    def load_file(self, path):
+        if self.encrypted:
+            return self.enc_ctx.load_file(path)
+        else:
+            return open(path, 'rb').read()
+
+    def save_file(self, data, path):
+        if self.encrypted:
+            self.enc_ctx.save_file(path, data)
+        else:
+            with open(path, 'wb') as fp:
+                fp.write(data.encode('utf-8'))
