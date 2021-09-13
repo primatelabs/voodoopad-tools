@@ -81,9 +81,16 @@ class DataStore:
         for item_uuid in self.item_plists.keys():
             item_plist = self.item_plist(item_uuid)
 
-            # If the current item is an alias, then there is no file associated with
-            # it.  Skip it and move on to the next item.
+            # If the current item is a page alias, then there is no file
+            # associated with it.  Skip it and move on to the next item.
             if item_plist['uti'] in ['com.fm.page-alias']:
+                continue
+
+            # If the current item is a file alias, skip it and move on to the
+            # next item.  The file alias is stored as an opaque blob created
+            # with [NSURL bookmarkDataWithOptions] which we cannot parse at
+            # this time.
+            if item_plist['uti'] in ['com.fm.file-alias']:
                 continue
 
             item_path = self.item_path(item_uuid)
@@ -91,6 +98,8 @@ class DataStore:
             if not item_path.exists():
                 # FIXME: Raise an error that indicates the vpdoc is invalid or corrupt.
                 raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), item_path)
+            print(item_uuid)
+            print(item_path)
             self.items[item_uuid] = self.load_file(item_path).decode('utf-8')
 
     def item_uuids(self):
