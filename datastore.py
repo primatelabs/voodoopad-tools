@@ -171,6 +171,7 @@ class DataStore:
             return plistlib.load(open(path, 'rb'), fmt=plistlib.FMT_XML)
 
     def save_plist(self, plist, path):
+        os.makedirs(os.path.dirname(path), exist_ok=True)
         if self.encrypted:
             return self.enc_ctx.save_plist(plist, path)
         else:
@@ -184,8 +185,9 @@ class DataStore:
             return open(path, 'rb').read()
 
     def save_file(self, data, path):
+        os.makedirs(os.path.dirname(path), exist_ok=True)
         if self.encrypted:
             self.enc_ctx.save_file(path, data)
         else:
             with open(path, 'wb') as fp:
-                fp.write(data.encode('utf-8'))
+                fp.write(data)
