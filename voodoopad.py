@@ -355,10 +355,9 @@ def usage():
     print('Options:')
     print('--password <password>')
 
-def main():
+def main(args):
     cmd = ''
 
-    args = sys.argv
     password = None
 
     # Parse out --password <password>
@@ -461,4 +460,4 @@ def main():
         usage()
 
 if __name__ == '__main__':
-    main()
+    main(sys.argv)
