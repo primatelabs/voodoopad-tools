@@ -36,9 +36,22 @@ class PageFormat:
     MarkDown = 'net.daringfireball.markdown'
 
 class VPCache:
-    def __init__(self, ds_path):
-        self.db_path = str(Path(ds_path, 'cache.db'))
+    def __init__(self, ds_path, in_memory=False):
+        self.conn_ = None
+
+        if in_memory:
+            print('Using in-memory cache')
+            self.db_path = str(Path(ds_path, ':memory:'))
+        else:
+            self.db_path = str(Path(ds_path, 'cache.db'))
+
         self.init_cache()
+
+    def get_connection(self):
+        if self.conn_ == None:
+            self.conn_ = sqlite3.connect(self.db_path)
+
+        return self.conn_
 
     def init_cache(self):
 
@@ -46,7 +59,7 @@ class VPCache:
         if os.path.isfile(self.db_path):
             return
 
-        con = sqlite3.connect(self.db_path)
+        con = self.get_connection()
 
         cur = con.cursor()
 
@@ -55,10 +68,9 @@ class VPCache:
         cur.execute('''create table refs(wikiword text, uuid text, key text)''')
 
         con.commit()
-        con.close()
 
     def update_cache(self, ds):
-        con = sqlite3.connect(self.db_path)
+        con = self.get_connection()
 
         cur = con.cursor()
 
@@ -116,7 +128,6 @@ class VPCache:
 
         cur = con.cursor()
 
-        # Get
         cur.execute('select key from items where uuid = ?', (uuid,))
 
         row = cur.fetchone()
@@ -239,13 +250,13 @@ class VoodooPad:
     path_ = None
     password_ = None
 
-    def __init__(self, document_path = None, password = None):
+    def __init__(self, document_path = None, password = None, in_memory = False):
         self.path_ = document_path
         self.password_ = password
-
+        self.in_memory_ = in_memory
         if self.path_ != None:
             self.ds_ = datastore.DataStore(self.path_, password)
-            self.cache_ = VPCache(self.path_)
+            self.cache_ = VPCache(self.path_, self.in_memory_)
             self.cache_.update_cache(self.ds_)
 
     def sha1_hash(self, s):
@@ -436,7 +447,7 @@ class VoodooPad:
 
 
         self.ds_ = datastore.DataStore(document_path, password)
-        self.cache_ = VPCache(document_path)
+        self.cache_ = VPCache(document_path, self.in_memory_)
         self.cache_.update_cache(self.ds_)
 
         # Update the cache and dump information about the document
@@ -474,5 +485,5 @@ class VoodooPad:
             self.usage()
 
 if __name__ == '__main__':
-    vp = VoodooPad()
+    vp = VoodooPad(None, None, True)
     vp.main(sys.argv)
