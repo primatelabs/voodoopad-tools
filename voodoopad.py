@@ -232,197 +232,163 @@ def show_wikiwords(ds):
         print(w)
         print(keywords[w])
 
-def sha1_hash(s):
-    sha1 = hashlib.sha1()
-    sha1.update(s.encode('utf-8'))
-    return sha1.hexdigest()
+
+class VoodooPad:
+    ds_ = None
+    cache_ = None
+    path_ = None
+    password_ = None
+
+    def __init__(self, document_path = None, password = None):
+        self.path_ = document_path
+        self.password_ = password
+
+        if self.path_ != None:
+            self.ds_ = datastore.DataStore(self.path_, password)
+            self.cache_ = VPCache(self.path_)
+            self.cache_.update_cache(self.ds_)
+
+    def sha1_hash(self, s):
+        sha1 = hashlib.sha1()
+        sha1.update(s.encode('utf-8'))
+        return sha1.hexdigest()
 
 
-# Returns a markdown link with the given text and URL
-def markdown_link(text, url):
-    return '[{0}]({1})'.format(text, url)
+    # Returns a markdown link with the given text and URL
+    def markdown_link(self, text, url):
+        return '[{0}]({1})'.format(text, url)
 
-# Determines if an index is inside a markdown link
-def in_markdown_link(text, idx):
-    size = 64
+    # Determines if an index is inside a markdown link
+    def in_markdown_link(self, text, idx):
+        size = 64
 
-    left_paren = text.find('(', max(idx - size, 0), idx)
-    right_paren = text.find(')', idx, min(idx + size, len(text) - 1))
+        left_paren = text.find('(', max(idx - size, 0), idx)
+        right_paren = text.find(')', idx, min(idx + size, len(text) - 1))
 
-    left_bracket = text.find('[', max(idx - size, 0), idx)
-    right_bracket = text.find(']', idx, min(idx + size, len(text) - 1))
+        left_bracket = text.find('[', max(idx - size, 0), idx)
+        right_bracket = text.find(']', idx, min(idx + size, len(text) - 1))
 
-    if left_bracket != -1 and right_bracket != -1:
-        if text[right_bracket + 1] == '(':
-            return True
+        if left_bracket != -1 and right_bracket != -1:
+            if text[right_bracket + 1] == '(':
+                return True
 
-    if left_paren != -1 and right_paren != -1:
-        if text[left_paren - 1] == ']':
-            return True
+        if left_paren != -1 and right_paren != -1:
+            if text[left_paren - 1] == ']':
+                return True
 
-    return False
+        return False
 
-# Convert the page to markdown
-def render_page(ds, cache, uuid, output_dir):
+    # Convert the page to markdown
+    def render_page(self, ds, cache, uuid, output_dir):
 
-    p = ds.item_path(uuid)
+        p = ds.item_path(uuid)
 
-    plist = ds.item_plist(uuid)
+        plist = ds.item_plist(uuid)
 
-    display_name = plist['displayName']
-    page_key = plist['key']
+        display_name = plist['displayName']
+        page_key = plist['key']
 
-    print(display_name + '.md')
+        print(display_name + '.md')
 
-    text = ds.item(uuid)
+        text = ds.item(uuid)
 
-    links = cache.get_links(uuid)
+        links = cache.get_links(uuid)
 
-    # Replace keywords with markdown links
-    for key in links:
-        idx = 0
+        # Replace keywords with markdown links
+        for key in links:
+            idx = 0
 
-        # Do not link this document to itself
-        if key == page_key:
-            continue
+            # Do not link this document to itself
+            if key == page_key:
+                continue
 
-        # Find the locations of the keyword
-        indexes = []
-        while True:
-            idx = text.lower().find(key, idx)
-            if idx == -1:
-                break
+            # Find the locations of the keyword
+            indexes = []
+            while True:
+                idx = text.lower().find(key, idx)
+                if idx == -1:
+                    break
 
-            # If the word is inside a markdown link and its the only thing in the link, then we
-            # want to replace the link target with the file name e.g. [Napoleon](Napoleon) becomes
-            # [Napoleon](Napoleon.md)
-            if text[idx - 1] == '(' and text[idx + len(key)] == ')' and text[idx - 2] == ']':
+                # If the word is inside a markdown link and its the only thing in the link, then we
+                # want to replace the link target with the file name e.g. [Napoleon](Napoleon) becomes
+                # [Napoleon](Napoleon.md)
+                if text[idx - 1] == '(' and text[idx + len(key)] == ')' and text[idx - 2] == ']':
+                    indexes.append(idx)
+
+                # Ignore if its part of a bigger word but accept if its surrounded by punctuation
+                # TODO: Is there a better way to do this?
+                if text[idx - 1] not in [' ','\n', '\r'] or text[idx + len(key)] not in [' ', '.', ',','\n', '\r']:
+                    idx = idx + len(key)
+                    continue
+
+                # Ignore if already inside a markdown link
+                if self.in_markdown_link(text, idx):
+                    idx = idx + len(key)
+                    continue
+
                 indexes.append(idx)
-
-            # Ignore if its part of a bigger word but accept if its surrounded by punctuation
-            # TODO: Is there a better way to do this?
-            if text[idx - 1] not in [' ','\n', '\r'] or text[idx + len(key)] not in [' ', '.', ',','\n', '\r']:
                 idx = idx + len(key)
-                continue
 
-            # Ignore if already inside a markdown link
-            if in_markdown_link(text, idx):
-                idx = idx + len(key)
-                continue
+            offset = 0
+            for idx in indexes:
 
-            indexes.append(idx)
-            idx = idx + len(key)
+                if text[idx + offset - 1] == '(' and text[idx + offset + len(key)] == ')' and text[idx + offset - 2] == ']':
+                    replacement = links[key] + '.md'
+                    text = text[:idx + offset] + links[key] + '.md' + text[idx + offset + len(key):]
+                    offset = offset + len(replacement) - len(key)
+                else:
+                    word = text[idx + offset:idx + offset + len(key)]
+                    markdown = self.markdown_link(word, links[key] + '.md')
+                    text = text[:idx + offset] + markdown + text[idx + offset + len(key):]
+                    offset = offset + len(markdown) - len(key)
 
-        offset = 0
-        for idx in indexes:
+        filename = output_dir + '/{0}.md'.format(display_name)
 
-            if text[idx + offset - 1] == '(' and text[idx + offset + len(key)] == ')' and text[idx + offset - 2] == ']':
-                replacement = links[key] + '.md'
-                text = text[:idx + offset] + links[key] + '.md' + text[idx + offset + len(key):]
-                offset = offset + len(replacement) - len(key)
-            else:
-                word = text[idx + offset:idx + offset + len(key)]
-                markdown = markdown_link(word, links[key] + '.md')
-                text = text[:idx + offset] + markdown + text[idx + offset + len(key):]
-                offset = offset + len(markdown) - len(key)
-
-    filename = output_dir + '/{0}.md'.format(display_name)
-
-    with open(filename, 'w') as f:
-        f.write(text)
+        with open(filename, 'w') as f:
+            f.write(text)
 
 
 
-def render_document(ds, cache, output_dir):
+    def render_document(self, ds, cache, output_dir):
 
-    if not os.path.exists(output_dir):
-        os.mkdir(output_dir)
+        if not os.path.exists(output_dir):
+            os.mkdir(output_dir)
 
-    for uuid in ds.item_uuids():
-        render_page(ds, cache, uuid, output_dir)
-
-
-def add_item(ds, name, text, format=PageFormat.Plaintext):
-
-    ds.add_item(name, text, format)
+        for uuid in ds.item_uuids():
+            self.render_page(ds, cache, uuid, output_dir)
 
 
-def usage():
-    print('voodoopad.py [options] <document> <command>')
-    print('voodoopad.py [options] <document name> add <file> <page name> <format>')
-    print('voodoopad.py [options] <document name> render <output directory>')
-    print('')
-    print('Options:')
-    print('--password <password>')
-
-def main(args):
-    cmd = ''
-
-    password = None
-
-    # Parse out --password <password>
-    for i in range(0, len(args)):
-        if args[i] == '--password':
-            if i + 1 == len(args):
-                print('--password requires an argument')
+    def add_item(self, ds, name, text, format=PageFormat.Plaintext):
+        for item in self.ds_.item_plists.values():
+            if item['displayName'].lower() == name.lower():
+                print('A page with that name already exists')
                 return
 
-            # Get the password and delete these two arguments
-            password = args[i + 1]
-            del args[i]
-            del args[i]
-            break
+        self.ds_.add_item(name, text, format)
 
-    if len(args) <= 1:
-        usage()
-        return
+    def render(self, output_dir):
+        self.cache_.update_cache(self.ds_)
+        self.render_document(self.ds_, self.cache_, output_dir)
 
-    document_path = args[1]
+    def print_info(self):
+        print(self.ds_.path)
+        print(self.ds_.storeinfo)
+        print(self.ds_.properties)
 
-    if len(args) >= 3:
-        cmd = args[2]
-
-
-    # Update the cache and dump information about the document
-    if cmd == '':
-        ds = datastore.DataStore(document_path, password)
-
-        print(ds.path)
-        print(ds.storeinfo)
-        print(ds.properties)
-
-        print(ds.validate())
-
-        cache = VPCache(document_path)
-        cache.update_cache(ds)
-
-        uuids = ds.item_uuids()
+        print(self.ds_.validate())
+        uuids = self.ds_.item_uuids()
 
         for uuid in uuids:
-            print(ds.item_plist(uuid)['displayName'], 'links to:')
-            for id in cache.get_forwardlinks(uuid):
-                print(id, ds.item_plist(id)['displayName'])
+            print(self.ds_.item_plist(uuid)['displayName'], 'links to:')
+            for id in self.cache_.get_forwardlinks(uuid):
+                print(id, self.ds_.item_plist(id)['displayName'])
 
         for uuid in uuids:
-            print(ds.item_plist(uuid)['displayName'], ' backlinks to:')
-            for id in cache.get_backlinks(uuid):
-                print(id, ds.item_plist(id)['displayName'])
+            print(self.ds_.item_plist(uuid)['displayName'], ' backlinks to:')
+            for id in self.cache_.get_backlinks(uuid):
+                print(id, self.ds_.item_plist(id)['displayName'])
 
-    # Add a page to the document
-    elif cmd == 'add':
-        if len(args) != 5 and len(args) != 6:
-            usage()
-            return
-
-        ds = datastore.DataStore(document_path, password)
-
-        text_file = args[3]
-        name = args[4]
-
-        format = 'plaintext'
-        if len(args) > 5:
-            format = args[5]
-
+    def add(self, text, name, format):
         if format == 'plaintext':
             format = PageFormat.Plaintext
         elif format == 'markdown':
@@ -431,33 +397,82 @@ def main(args):
             print('Invalid format ', format)
             return
 
-        for item in ds.item_plists.values():
-            if item['displayName'].lower() == name.lower():
-                print('A page with that name already exists')
-                return
+        self.add_item(self.ds_, name, text, format)
 
-        with open(text_file, 'rb') as f:
-            text = f.read().decode('utf-8')
-            add_item(ds, name, text, format)
+    def usage(self):
+        print('voodoopad.py [options] <document> <command>')
+        print('voodoopad.py [options] <document name> add <file> <page name> <format>')
+        print('voodoopad.py [options] <document name> render <output directory>')
+        print('')
+        print('Options:')
+        print('--password <password>')
 
-    elif cmd == 'render':
-        if len(args) != 4:
-            usage()
+    def main(self, args):
+        cmd = ''
+
+        password = None
+
+        # Parse out --password <password>
+        for i in range(0, len(args)):
+            if args[i] == '--password':
+                if i + 1 == len(args):
+                    print('--password requires an argument')
+                    return
+
+                # Get the password and delete these two arguments
+                password = args[i + 1]
+                del args[i]
+                del args[i]
+                break
+
+        if len(args) <= 1:
+            self.usage()
             return
 
-        ds = datastore.DataStore(document_path, password)
+        document_path = args[1]
 
-        output_dir= args[3]
+        if len(args) >= 3:
+            cmd = args[2]
 
-        cache = VPCache(args[1])
-        cache.update_cache(ds)
-        render_document(ds, cache, output_dir)
 
-    else:
+        self.ds_ = datastore.DataStore(document_path, password)
+        self.cache_ = VPCache(document_path)
+        self.cache_.update_cache(self.ds_)
 
-        print('Unknown command', cmd)
-        print('')
-        usage()
+        # Update the cache and dump information about the document
+        if cmd == '':
+            self.print_info()
+        # Add a page to the document
+        elif cmd == 'add':
+            if len(args) != 5 and len(args) != 6:
+                self.usage()
+                return
+
+            text_file = args[3]
+            name = args[4]
+
+            format = 'plaintext'
+            if len(args) > 5:
+                format = args[5]
+
+            with open(text_file, 'rb') as f:
+                text = f.read().decode('utf-8')
+
+            self.add(text, name, format)
+
+        elif cmd == 'render':
+            if len(args) != 4:
+                self.usage()
+                return
+            output_dir= args[3]
+
+            self.render(output_dir)
+        else:
+
+            print('Unknown command', cmd)
+            print('')
+            self.usage()
 
 if __name__ == '__main__':
-    main(sys.argv)
+    vp = VoodooPad()
+    vp.main(sys.argv)
