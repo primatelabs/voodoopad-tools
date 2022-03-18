@@ -411,6 +411,12 @@ class VoodooPad:
             for id in self.cache_.get_backlinks(uuid):
                 print(id, self.ds_.item_plist(id)['displayName'])
 
+    def add_file(self, path, name, format):
+        with open(path, 'rb') as f:
+            text = f.read().decode('utf-8')
+
+        self.add(text, name, format)
+
     def add(self, text, name, format):
         if format == 'plaintext':
             format = PageFormat.Plaintext
@@ -478,10 +484,7 @@ class VoodooPad:
             if len(args) > 5:
                 format = args[5]
 
-            with open(text_file, 'rb') as f:
-                text = f.read().decode('utf-8')
-
-            self.add(text, name, format)
+            self.add_file(text_file, name, format)
 
         elif cmd == 'render':
             if len(args) != 4:
@@ -497,5 +500,5 @@ class VoodooPad:
             self.usage()
 
 if __name__ == '__main__':
-    vp = VoodooPad(None, None, True)
+    vp = VoodooPad(None, None)
     vp.main(sys.argv)
