@@ -370,6 +370,7 @@ class VoodooPad:
                 f.write(text)
 
     def render_doc(self):
+        self.cache_.update_cache(self.ds_)
 
         pages = []
         for uuid in self.ds_.item_uuids():
