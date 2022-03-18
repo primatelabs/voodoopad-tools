@@ -21,13 +21,12 @@
 # DEALINGS IN THE SOFTWARE.
 
 import errno
-import glob
 import hashlib
 import os
 from pathlib import Path
 import plistlib
 import uuid as UUID
-import vpenc
+#import vpenc
 
 def sha1_hash(s):
     sha1 = hashlib.sha1()
@@ -35,13 +34,15 @@ def sha1_hash(s):
     return sha1.hexdigest()
 
 class DataStore:
-    def __init__(self, path, password=None):
+    def __init__(self, path, password=None, in_memory=False):
         self.path = Path(path)
         self.encrypted = False
         self.enc_ctx = None
         self.password = password
+        self.in_memory = in_memory
 
         storeinfo_path = Path(self.path, 'storeinfo.plist')
+        print('Path: {}'.format(self.path))
         if not storeinfo_path.exists():
             # FIXME: Raise an error that indicates the vpdoc is invalid or corrupt.
             raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), storeinfo_path)
@@ -51,7 +52,7 @@ class DataStore:
             # FIXME: Raise an error that indicates the vpdoc is invalid or corrupt.
             raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), properties_path)
 
-        self.storeinfo = plistlib.load(open(storeinfo_path, 'rb'), fmt=plistlib.FMT_XML)
+        self.storeinfo = plistlib.load(open(str(storeinfo_path), 'rb'), fmt=plistlib.FMT_XML)
 
         if self.storeinfo['isEncrypted']:
             if self.password == None:
@@ -71,7 +72,8 @@ class DataStore:
             raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), properties_path)
 
         self.item_plists = {}
-        item_plist_paths  = items_path.rglob('*.plist')
+        #item_plist_paths  = items_path.rglob('*.plist')
+        item_plist_paths = self.get_plists(items_path)
         for item_plist_path in item_plist_paths:
             item_uuid = item_plist_path.stem
             item_plist = self.load_plist(item_plist_path)
@@ -156,8 +158,9 @@ class DataStore:
         plist_path = Path(self.path, 'pages', item_uuid[0], item_uuid + '.plist')
 
         # Save to disk
-        self.save_plist(pl, plist_path)
-        self.save_file(text.encode('utf-8'), item_path)
+        if not self.in_memory:
+            self.save_plist(pl, plist_path)
+            self.save_file(text.encode('utf-8'), item_path)
 
         # Keep in memory
         self.items[item_uuid] = text
@@ -168,7 +171,7 @@ class DataStore:
         if self.encrypted:
             return self.enc_ctx.load_plist(path)
         else:
-            return plistlib.load(open(path, 'rb'), fmt=plistlib.FMT_XML)
+            return plistlib.load(open(str(path), 'rb'), fmt=plistlib.FMT_XML)
 
     def save_plist(self, plist, path):
         os.makedirs(os.path.dirname(path), exist_ok=True)
@@ -182,7 +185,7 @@ class DataStore:
         if self.encrypted:
             return self.enc_ctx.load_file(path)
         else:
-            return open(path, 'rb').read()
+            return open(str(path), 'rb').read()
 
     def save_file(self, data, path):
         os.makedirs(os.path.dirname(path), exist_ok=True)
@@ -191,3 +194,24 @@ class DataStore:
         else:
             with open(path, 'wb') as fp:
                 fp.write(data)
+
+    # This is a work-around for Path.rglob('*.plist'). Path.rglob() has issues when running inside
+    # Geekbench
+    def get_plists(self, dir):
+
+      subdirs = os.listdir(str(dir))
+      print(subdirs)
+      plists = []
+      for s in subdirs:
+        path = str(Path(dir, s))
+
+        if not os.path.isdir(path):
+            continue
+
+        entires = os.listdir(path)
+        for e in entires:
+          if e.endswith('.plist'):
+            plists.append(Path(path, e))
+
+
+      return plists

@@ -26,8 +26,6 @@ import datastore
 import tokenizer
 import sqlite3
 import os
-import uuid as UUID
-import plistlib
 from pathlib import Path
 import hashlib
 
@@ -38,10 +36,10 @@ class PageFormat:
 class VPCache:
     def __init__(self, ds_path, in_memory=False):
         self.conn_ = None
-
+        self.in_memory_ = in_memory
         if in_memory:
             print('Using in-memory cache')
-            self.db_path = str(Path(ds_path, ':memory:'))
+            self.db_path = ':memory:'
         else:
             self.db_path = str(Path(ds_path, 'cache.db'))
 
@@ -56,7 +54,7 @@ class VPCache:
     def init_cache(self):
 
         # If the file exists, assume the tables already exist
-        if os.path.isfile(self.db_path):
+        if not self.in_memory_ and os.path.isfile(self.db_path):
             return
 
         con = self.get_connection()
@@ -70,6 +68,7 @@ class VPCache:
         con.commit()
 
     def update_cache(self, ds):
+
         con = self.get_connection()
 
         cur = con.cursor()
@@ -124,7 +123,7 @@ class VPCache:
 
     def get_backlinks(self, uuid):
 
-        con = sqlite3.connect(self.db_path)
+        con = self.get_connection()
 
         cur = con.cursor()
 
@@ -146,7 +145,7 @@ class VPCache:
         return links
 
     def get_forwardlinks(self, uuid):
-        con = sqlite3.connect(self.db_path)
+        con = self.get_connection()
 
         cur = con.cursor()
 
@@ -171,7 +170,7 @@ class VPCache:
     # Get the keywords that appear in the document with the given UUID
     def get_links(self, uuid):
 
-        con = sqlite3.connect(self.db_path)
+        con = self.get_connection()
 
         cur = con.cursor()
 
@@ -187,7 +186,7 @@ class VPCache:
         return links
     # Dump tables contents to stdout
     def dump_tables(self):
-        con = sqlite3.connect(self.db_path)
+        con = self.get_connection()
 
         cur = con.cursor()
 
@@ -254,8 +253,9 @@ class VoodooPad:
         self.path_ = document_path
         self.password_ = password
         self.in_memory_ = in_memory
+
         if self.path_ != None:
-            self.ds_ = datastore.DataStore(self.path_, password)
+            self.ds_ = datastore.DataStore(self.path_, password, in_memory)
             self.cache_ = VPCache(self.path_, self.in_memory_)
             self.cache_.update_cache(self.ds_)
 
@@ -290,7 +290,7 @@ class VoodooPad:
         return False
 
     # Convert the page to markdown
-    def render_page(self, ds, cache, uuid, output_dir):
+    def render_page(self, ds, cache, uuid):
 
         p = ds.item_path(uuid)
 
@@ -353,21 +353,33 @@ class VoodooPad:
                     text = text[:idx + offset] + markdown + text[idx + offset + len(key):]
                     offset = offset + len(markdown) - len(key)
 
-        filename = output_dir + '/{0}.md'.format(display_name)
-
-        with open(filename, 'w') as f:
-            f.write(text)
+        return text
 
 
-
-    def render_document(self, ds, cache, output_dir):
+    def render_document(self, output_dir):
 
         if not os.path.exists(output_dir):
             os.mkdir(output_dir)
 
-        for uuid in ds.item_uuids():
-            self.render_page(ds, cache, uuid, output_dir)
+        for uuid in self.ds_.item_uuids():
+            plist = self.ds_.item_plist(uuid)
+            display_name = plist['displayName']
+            text = self.render_page(self.ds_, self.cache_, uuid)
+            filename = output_dir + '/{0}.md'.format(display_name)
+            with open(filename, 'w') as f:
+                f.write(text)
 
+    def render_doc(self):
+
+        pages = []
+        for uuid in self.ds_.item_uuids():
+            plist = self.ds_.item_plist(uuid)
+            display_name = plist['displayName']
+            text = self.render_page(self.ds_, self.cache_, uuid)
+
+            pages.append({display_name, text})
+
+        return pages
 
     def add_item(self, ds, name, text, format=PageFormat.Plaintext):
         for item in self.ds_.item_plists.values():
@@ -379,7 +391,7 @@ class VoodooPad:
 
     def render(self, output_dir):
         self.cache_.update_cache(self.ds_)
-        self.render_document(self.ds_, self.cache_, output_dir)
+        self.render_document(output_dir)
 
     def print_info(self):
         print(self.ds_.path)
