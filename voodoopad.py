@@ -320,15 +320,17 @@ class VoodooPad:
                 if idx == -1:
                     break
 
-                # If the word is inside a markdown link and its the only thing in the link, then we
+                # If the word is a markdown link target and it's the only thing in the link target, then we
                 # want to replace the link target with the file name e.g. [Napoleon](Napoleon) becomes
                 # [Napoleon](Napoleon.md)
-                if text[idx - 1] == '(' and text[idx + len(key)] == ')' and text[idx - 2] == ']':
+                if idx >= 2 and idx + len(key) < len(text) and text[idx - 1] == '(' and text[idx + len(key)] == ')' and text[idx - 2] == ']':
                     indexes.append(idx)
+                    idx = idx + len(key)
+                    continue
 
-                # Ignore if its part of a bigger word but accept if its surrounded by punctuation
+                # Ignore if it's part of a bigger word but ccept if its surrounded by punctuation.
                 # TODO: Is there a better way to do this?
-                if text[idx - 1] not in [' ','\n', '\r'] or text[idx + len(key)] not in [' ', '.', ',','\n', '\r']:
+                if (idx != 0 and text[idx - 1] not in [' ','\n', '\r']) or (idx + len(key) < len(text) and text[idx + len(key)] not in [' ', '.', ',','\n', '\r']):
                     idx = idx + len(key)
                     continue
 
