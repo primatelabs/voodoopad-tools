@@ -38,7 +38,6 @@ class VPCache:
         self.conn_ = None
         self.in_memory_ = in_memory
         if in_memory:
-            print('Using in-memory cache')
             self.db_path = ':memory:'
         else:
             self.db_path = str(Path(ds_path, 'cache.db'))
@@ -299,8 +298,6 @@ class VoodooPad:
         display_name = plist['displayName']
         page_key = plist['key']
 
-        print(display_name + '.md')
-
         text = ds.item(uuid)
 
         links = cache.get_links(uuid)
@@ -397,11 +394,11 @@ class VoodooPad:
         self.render_document(output_dir)
 
     def print_info(self):
-        print(self.ds_.path)
-        print(self.ds_.storeinfo)
-        print(self.ds_.properties)
+        print('Path: {}'.format(self.ds_.path))
+        print('Info: {}'.format(self.ds_.storeinfo))
+        print('Properties: {}'.format(self.ds_.properties))
 
-        print(self.ds_.validate())
+        print('Valid: {}'.format(self.ds_.validate()))
         uuids = self.ds_.item_uuids()
 
         for uuid in uuids:

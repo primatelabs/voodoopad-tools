@@ -26,6 +26,8 @@ import os
 from pathlib import Path
 import plistlib
 import uuid as UUID
+
+# Disable encryption for now
 #import vpenc
 
 def sha1_hash(s):
@@ -42,7 +44,6 @@ class DataStore:
         self.in_memory = in_memory
 
         storeinfo_path = Path(self.path, 'storeinfo.plist')
-        print('Path: {}'.format(self.path))
         if not storeinfo_path.exists():
             # FIXME: Raise an error that indicates the vpdoc is invalid or corrupt.
             raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), storeinfo_path)
@@ -100,8 +101,6 @@ class DataStore:
             if not item_path.exists():
                 # FIXME: Raise an error that indicates the vpdoc is invalid or corrupt.
                 raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), item_path)
-            print(item_uuid)
-            print(item_path)
             self.items[item_uuid] = self.load_file(item_path).decode('utf-8')
 
     def item_uuids(self):
@@ -200,7 +199,6 @@ class DataStore:
     def get_plists(self, dir):
 
       subdirs = os.listdir(str(dir))
-      print(subdirs)
       plists = []
       for s in subdirs:
         path = str(Path(dir, s))
