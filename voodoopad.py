@@ -310,10 +310,12 @@ class VoodooPad:
             if key == page_key:
                 continue
 
+            text_lower = text.lower()
             # Find the locations of the keyword
             indexes = []
             while True:
-                idx = text.lower().find(key, idx)
+                #idx = text.lower().find(key, idx)
+                idx = text_lower.find(key, idx)
                 if idx == -1:
                     break
 
@@ -377,7 +379,7 @@ class VoodooPad:
             display_name = plist['displayName']
             text = self.render_page(self.ds_, self.cache_, uuid)
 
-            pages.append({display_name, text})
+            pages.append({'display_name':display_name, 'text':text})
 
         return pages
 
