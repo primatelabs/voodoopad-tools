@@ -295,14 +295,17 @@ class VoodooPad:
 
         plist = ds.item_plist(uuid)
 
-        display_name = plist['displayName']
         page_key = plist['key']
 
         text = ds.item(uuid)
 
         links = cache.get_links(uuid)
 
-        # Replace keywords with markdown links
+        # We are doing a case-insensitive search. Convert the text to lower case.
+        text_lower = text.lower()
+        indexes = {}
+
+        # Locate the keywords in the text and store the index
         for key in links:
             idx = 0
 
@@ -310,11 +313,7 @@ class VoodooPad:
             if key == page_key:
                 continue
 
-            text_lower = text.lower()
-            # Find the locations of the keyword
-            indexes = []
             while True:
-                #idx = text.lower().find(key, idx)
                 idx = text_lower.find(key, idx)
                 if idx == -1:
                     break
@@ -323,11 +322,11 @@ class VoodooPad:
                 # want to replace the link target with the file name e.g. [Napoleon](Napoleon) becomes
                 # [Napoleon](Napoleon.md)
                 if idx >= 2 and idx + len(key) < len(text) and text[idx - 1] == '(' and text[idx + len(key)] == ')' and text[idx - 2] == ']':
-                    indexes.append(idx)
+                    indexes[idx] = key
                     idx = idx + len(key)
                     continue
 
-                # Ignore if it's part of a bigger word but ccept if its surrounded by punctuation.
+                # Ignore if it's part of a bigger word but accept if its surrounded by punctuation.
                 # TODO: Is there a better way to do this?
                 if (idx != 0 and text[idx - 1] not in [' ','\n', '\r']) or (idx + len(key) < len(text) and text[idx + len(key)] not in [' ', '.', ',','\n', '\r']):
                     idx = idx + len(key)
@@ -338,21 +337,41 @@ class VoodooPad:
                     idx = idx + len(key)
                     continue
 
-                indexes.append(idx)
+                indexes[idx] = key
                 idx = idx + len(key)
 
-            offset = 0
-            for idx in indexes:
+        # Nothing to do if no keywords were found
+        if len(indexes) == 0:
+            return text
 
-                if text[idx + offset - 1] == '(' and text[idx + offset + len(key)] == ')' and text[idx + offset - 2] == ']':
-                    replacement = links[key] + '.md'
-                    text = text[:idx + offset] + links[key] + '.md' + text[idx + offset + len(key):]
-                    offset = offset + len(replacement) - len(key)
-                else:
-                    word = text[idx + offset:idx + offset + len(key)]
-                    markdown = self.markdown_link(word, links[key] + '.md')
-                    text = text[:idx + offset] + markdown + text[idx + offset + len(key):]
-                    offset = offset + len(markdown) - len(key)
+        # Replacing keywords will change the length of the text and change the positions of the
+        # other keywords. Sort the indexes so that we can do a single scan over the text and
+        # replace keywords as they appear, keeping track of the change in position.
+        sorted_keys = list(indexes.keys())
+        sorted_keys.sort()
+
+        sorted_indexes = []
+
+        for k in sorted_indexes:
+            sorted_indexes.append({'index':k, 'key':indexes[k]})
+
+        offset = 0
+        for s in sorted_indexes:
+
+            idx = s['index']
+            key = s['key']
+
+            if text[idx + offset - 1] == '(' and text[idx + offset + len(key)] == ')' and text[idx + offset - 2] == ']':
+                # Replace link inside of a markdown link
+                replacement = links[key] + '.md'
+                text = text[:idx + offset] + links[key] + '.md' + text[idx + offset + len(key):]
+                offset = offset + len(replacement) - len(key)
+            else:
+                # Add a markdown link
+                word = text[idx + offset:idx + offset + len(key)]
+                markdown = self.markdown_link(word, links[key] + '.md')
+                text = text[:idx + offset] + markdown + text[idx + offset + len(key):]
+                offset = offset + len(markdown) - len(key)
 
         return text
 
