@@ -26,6 +26,7 @@ import os
 from pathlib import Path
 import plistlib
 import uuid as UUID
+import xml.parsers.expat
 
 # Disable encryption for now
 #import vpenc
@@ -76,9 +77,16 @@ class DataStore:
         #item_plist_paths  = items_path.rglob('*.plist')
         item_plist_paths = self.get_plists(items_path)
         for item_plist_path in item_plist_paths:
-            item_uuid = item_plist_path.stem
-            item_plist = self.load_plist(item_plist_path)
-            self.item_plists[item_uuid] = item_plist
+            # VoodooPad (or the underlying macOS libraries) may generate
+            # invalid XML. Skip the plist (and the associated item) if the XML
+            # parser throws an exception.
+            try:
+                item_uuid = item_plist_path.stem
+                item_plist = self.load_plist(item_plist_path)
+                self.item_plists[item_uuid] = item_plist
+            except xml.parsers.expat.ExpatError:
+                print(f'Skipping {item_uuid} due to invalid plist')
+                pass
 
         self.items = {}
         for item_uuid in self.item_plists.keys():
@@ -101,6 +109,7 @@ class DataStore:
             if not item_path.exists():
                 # FIXME: Raise an error that indicates the vpdoc is invalid or corrupt.
                 raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), item_path)
+
             self.items[item_uuid] = self.load_file(item_path).decode('utf-8')
 
     def item_uuids(self):
