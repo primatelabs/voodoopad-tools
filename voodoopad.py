@@ -20,14 +20,14 @@
 # FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 # DEALINGS IN THE SOFTWARE.
 
-import sys
-
-import datastore
-import tokenizer
-import sqlite3
+import argparse
+import hashlib
 import os
 from pathlib import Path
-import hashlib
+import sqlite3
+import tokenizer
+
+import datastore
 
 class PageFormat:
     Plaintext = 'public.utf8-plain-text'
@@ -449,77 +449,34 @@ class VoodooPad:
 
         self.add_item(self.ds_, name, text, format)
 
-    def usage(self):
-        print('voodoopad.py [options] <document> <command>')
-        print('voodoopad.py [options] <document name> add <file> <page name> <format>')
-        print('voodoopad.py [options] <document name> render <output directory>')
-        print('')
-        print('Options:')
-        print('--password <password>')
 
-    def main(self, args):
-        cmd = ''
+def main():
+    vp = VoodooPad(None, None)
 
-        password = None
+    parser = argparse.ArgumentParser()
+    parser.add_argument('document', help='document')
+    parser.add_argument('command', nargs='?', default=None, help='command')
+    parser.add_argument('--file', help='file')
+    parser.add_argument('--format', default='plaintext', help='format')
+    parser.add_argument('--output', default=None, help='output')
+    parser.add_argument('--password', help='password')
+    parser.add_argument('--title', help='title')
 
-        # Parse out --password <password>
-        for i in range(0, len(args)):
-            if args[i] == '--password':
-                if i + 1 == len(args):
-                    print('--password requires an argument')
-                    return
+    args = parser.parse_args()
+    print(args)
 
-                # Get the password and delete these two arguments
-                password = args[i + 1]
-                del args[i]
-                del args[i]
-                break
+    vp.ds_ = datastore.DataStore(args.document, args.password)
+    vp.cache_ = VPCache(args.document, True)
+    vp.cache_.update_cache(vp.ds_)
 
-        if len(args) <= 1:
-            self.usage()
-            return
-
-        document_path = args[1]
-
-        if len(args) >= 3:
-            cmd = args[2]
-
-
-        self.ds_ = datastore.DataStore(document_path, password)
-        self.cache_ = VPCache(document_path, self.in_memory_)
-        self.cache_.update_cache(self.ds_)
-
-        # Update the cache and dump information about the document
-        if cmd == '':
-            self.print_info()
-        # Add a page to the document
-        elif cmd == 'add':
-            if len(args) != 5 and len(args) != 6:
-                self.usage()
-                return
-
-            text_file = args[3]
-            name = args[4]
-
-            format = 'plaintext'
-            if len(args) > 5:
-                format = args[5]
-
-            self.add_file(text_file, name, format)
-
-        elif cmd == 'render':
-            if len(args) != 4:
-                self.usage()
-                return
-            output_dir= args[3]
-
-            self.render(output_dir)
-        else:
-
-            print('Unknown command', cmd)
-            print('')
-            self.usage()
+    if args.command == None:
+        vp.print_info()
+    elif args.command == 'add':
+        vp.add_file(args.file, args.title, args.format)
+    elif args.command == 'render':
+        vp.render(args.output)
+    else:
+        print(f'Unknown command \'{args.command}\'')
 
 if __name__ == '__main__':
-    vp = VoodooPad(None, None)
-    vp.main(sys.argv)
+    main()
