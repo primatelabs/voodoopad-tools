@@ -451,8 +451,6 @@ class VoodooPad:
 
 
 def main():
-    vp = VoodooPad(None, None)
-
     parser = argparse.ArgumentParser()
     parser.add_argument('document', help='document')
     parser.add_argument('command', nargs='?', default=None, help='command')
@@ -465,7 +463,12 @@ def main():
     args = parser.parse_args()
     print(args)
 
-    vp.ds_ = datastore.DataStore(args.document, args.password)
+    if args.command == 'create':
+        datastore.DataStore.create(args.document)
+        return
+
+    vp = VoodooPad(None, None)
+    vp.ds_ = datastore.DataStore.open(args.document, args.password)
     vp.cache_ = VPCache(args.document, True)
     vp.cache_.update_cache(vp.ds_)
 

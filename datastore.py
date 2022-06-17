@@ -37,60 +37,119 @@ def sha1_hash(s):
     return sha1.hexdigest()
 
 class DataStore:
-    def __init__(self, path, password=None, in_memory=False):
-        self.path = Path(path)
+    def __init__(self):
+        self.path = None
         self.encrypted = False
         self.enc_ctx = None
-        self.password = password
-        self.in_memory = in_memory
+        self.password = None
+        self.storeinfo = {}
+        self.properties = {}
+        self.items = {}
+        self.item_plists = {}
 
-        storeinfo_path = Path(self.path, 'storeinfo.plist')
+    @classmethod
+    def create(cls, path):
+        ds = cls()
+        ds.path = Path(path)
+
+        ds.in_memory = False
+
+        os.mkdir(ds.path)
+        os.mkdir(Path(ds.path, 'pages'))
+        for i in range(0, 16):
+            os.mkdir(Path(ds.path, 'pages', f'{i:x}'))
+
+        ds.storeinfo = {
+            'isEncrypted': False,
+            'uuid': str(UUID.uuid4()),
+            'VoodooPadBundleVersion': 6,
+        }
+
+        ds.properties = {
+            'allowPluginLinks': True,
+            'bdToBookmarkAliasUpgrade': True,
+            'createSpotlightIndex': True,
+            'dbVersion': 7,
+            'expectedPageCount': 0,
+            'localWebAccess': False,
+            'newPageUTI': 'net.daringfireball.markdown',
+            'skIndexVersion': 7,
+            'updatedFMPageToRealUTIs': True,
+            'updatedSpecialPages3': True,
+            'uuid': ds.storeinfo['uuid'],
+        }
+
+        index_title = 'Index'
+        index_uuid = ds.add_item('Index', 'Write about Index here.', 'net.daringfireball.markdown')
+
+        ds.properties['defaultPage'] = index_title
+        ds.properties['defaultUUID'] = index_uuid
+
+        storeinfo_path = Path(ds.path, 'storeinfo.plist')
+        plistlib.dump(ds.storeinfo, open(str(storeinfo_path), 'wb'), fmt=plistlib.FMT_XML)
+
+        properties_path = Path(ds.path, 'properties.plist')
+        plistlib.dump(ds.properties, open(str(properties_path), 'wb'), fmt=plistlib.FMT_XML)
+
+        return ds
+
+    @classmethod
+    def open(cls, path, password=None, in_memory=False):
+        ds = cls()
+
+        ds.path = Path(path)
+        ds.encrypted = False
+        ds.enc_ctx = None
+        ds.password = password
+        ds.in_memory = in_memory
+
+        storeinfo_path = Path(ds.path, 'storeinfo.plist')
         if not storeinfo_path.exists():
             # FIXME: Raise an error that indicates the vpdoc is invalid or corrupt.
             raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), storeinfo_path)
 
-        properties_path = Path(self.path, 'properties.plist')
+        properties_path = Path(ds.path, 'properties.plist')
         if not properties_path.exists():
             # FIXME: Raise an error that indicates the vpdoc is invalid or corrupt.
             raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), properties_path)
 
-        self.storeinfo = plistlib.load(open(str(storeinfo_path), 'rb'), fmt=plistlib.FMT_XML)
+        ds.storeinfo = plistlib.load(open(str(storeinfo_path), 'rb'), fmt=plistlib.FMT_XML)
 
-        if self.storeinfo['isEncrypted']:
-            if self.password == None:
+        if ds.storeinfo['isEncrypted']:
+            if ds.password == None:
                 raise Exception('Password is required for encrypted document')
-            self.encrypted = True
-            self.enc_ctx = vpenc.VPEncryptionContext()
-            self.enc_ctx.load(self.path, self.password)
+            ds.encrypted = True
+            ds.enc_ctx = vpenc.VPEncryptionContext()
+            ds.enc_ctx.load(ds.path, ds.password)
 
-        if self.storeinfo['VoodooPadBundleVersion'] != 6:
+        if ds.storeinfo['VoodooPadBundleVersion'] != 6:
             raise Exception('Unsupported')
 
-        self.properties = self.load_plist(properties_path)
+        ds.properties = ds.load_plist(properties_path)
 
-        items_path = Path(self.path, 'pages')
+        items_path = Path(ds.path, 'pages')
         if not items_path.is_dir():
             # FIXME: Raise an error that indicates the vpdoc is invalid or corrupt.
             raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), properties_path)
 
-        self.item_plists = {}
+        ds.item_plists = {}
         #item_plist_paths  = items_path.rglob('*.plist')
-        item_plist_paths = self.get_plists(items_path)
+        item_plist_paths = ds.get_plists(items_path)
         for item_plist_path in item_plist_paths:
             # VoodooPad (or the underlying macOS libraries) may generate
             # invalid XML. Skip the plist (and the associated item) if the XML
             # parser throws an exception.
             try:
                 item_uuid = item_plist_path.stem
-                item_plist = self.load_plist(item_plist_path)
-                self.item_plists[item_uuid] = item_plist
+                item_plist = ds.load_plist(item_plist_path)
+                ds.item_plists[item_uuid] = item_plist
             except xml.parsers.expat.ExpatError:
                 print(f'Skipping {item_uuid} due to invalid plist')
                 pass
 
-        self.items = {}
-        for item_uuid in self.item_plists.keys():
-            item_plist = self.item_plist(item_uuid)
+        ds.items = {}
+        for item_uuid in ds.item_plists.keys():
+            item_plist = ds.item_plist(item_uuid)
 
             # If the current item is a page alias, then there is no file
             # associated with it.  Skip it and move on to the next item.
@@ -104,13 +163,18 @@ class DataStore:
             if item_plist['uti'] in ['com.fm.file-alias']:
                 continue
 
-            item_path = self.item_path(item_uuid)
+            item_path = ds.item_path(item_uuid)
 
             if not item_path.exists():
                 # FIXME: Raise an error that indicates the vpdoc is invalid or corrupt.
                 raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), item_path)
 
-            self.items[item_uuid] = self.load_file(item_path).decode('utf-8')
+            ds.items[item_uuid] = ds.load_file(item_path).decode('utf-8')
+
+        return ds
+
+    def close(self):
+        pass
 
     def item_uuids(self):
         return self.item_plists.keys()
@@ -173,6 +237,8 @@ class DataStore:
         # Keep in memory
         self.items[item_uuid] = text
         self.item_plists[item_uuid] = pl
+
+        return item_uuid
 
 
     def load_plist(self, path):
