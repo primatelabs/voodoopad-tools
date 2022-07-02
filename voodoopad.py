@@ -31,7 +31,6 @@ import tokenizer
 
 import datastore
 
-
 class PageFormat:
     Plaintext = 'public.utf8-plain-text'
     MarkDown = 'net.daringfireball.markdown'
@@ -55,26 +54,22 @@ class VPCache:
         return self.conn_
 
     def init_cache(self):
-
         # If the file exists, assume the tables already exist
         if not self.in_memory_ and os.path.isfile(self.db_path):
             return
 
-        con = self.get_connection()
-
-        cur = con.cursor()
+        connection = self.get_connection()
+        cursor = connection.cursor()
 
         # create table
-        cur.execute('''create table items(uuid text, key text, displayname text, dataHash text)''')
-        cur.execute('''create table refs(wikiword text, uuid text, key text)''')
+        cursor.execute('''CREATE TABLE items(uuid TEXT, key TEXT, displayname TEXT, dataHash TEXT)''')
+        cursor.execute('''CREATE TABLE refs(wikiword TEXT, uuid TEXT, key TEXT)''')
 
-        con.commit()
+        connection.commit()
 
     def update_cache(self, ds):
-
-        con = self.get_connection()
-
-        cur = con.cursor()
+        connection = self.get_connection()
+        cursor = connection.cursor()
 
         ds.regenerate_trie()
         uuids = ds.item_uuids()
@@ -88,8 +83,8 @@ class VPCache:
             item = ds.item_plist(uuid)
             data_hash = item['dataHash']
 
-            cur.execute('select uuid, dataHash from items where uuid = ?', (uuid,))
-            row = cur.fetchone()
+            cursor.execute('SELECT uuid, dataHash FROM items WHERE uuid = ?', (uuid,))
+            row = cursor.fetchone()
 
             # This item does not exist. It is a new item.
             if row is None:
@@ -105,66 +100,59 @@ class VPCache:
 
         # Delete keywords for updated items.
         for uuid in updated_items:
-            cur.execute('delete from refs where uuid = ?', (uuid,))
+            cursor.execute('DELETE FROM refs WHERE uuid = ?', (uuid,))
 
         for uuid in updated_items:
             keywords = get_wikiwords(ds, uuid)
             for k in keywords:
-                cur.execute('insert into refs values(?, ?, ?)', (k, uuid, k.lower()))
+                cursor.execute('INSERT INTO refs VALUES(?, ?, ?)', (k, uuid, k.lower()))
 
         for uuid in new_items:
             plist = ds.item_plist(uuid)
             key = plist['key']
             displayname = plist['displayName']
             data_hash = plist['dataHash']
-            cur.execute('insert into items values (?, ?, ?, ?)', (uuid, key, displayname, data_hash))
+            cursor.execute('INSERT INTO items VALUES (?, ?, ?, ?)', (uuid, key, displayname, data_hash))
 
             keywords = get_wikiwords(ds, uuid)
             for k in keywords:
-                cur.execute('insert into refs values(?, ?, ?)', (k, uuid, k.lower()))
+                cursor.execute('INSERT INTO refs VALUES(?, ?, ?)', (k, uuid, k.lower()))
 
-        con.commit()
+        connection.commit()
 
     def get_backlinks(self, uuid):
+        connection = self.get_connection()
+        cursor = connection.cursor()
 
-        con = self.get_connection()
-
-        cur = con.cursor()
-
-        cur.execute('select key from items where uuid = ?', (uuid,))
-
-        row = cur.fetchone()
-
+        cursor.execute('SELECT key FROM items WHERE uuid = ?', (uuid,))
+        row = cursor.fetchone()
         if row is None:
             return None
-
         key = row[0]
 
-        rows = cur.execute("select uuid from refs where key = '{0}'".format(key))
-
         links = []
+        rows = cursor.execute("SELECT uuid FROM refs WHERE key = ?", (key,))
         for r in rows:
             links.append(r[0])
 
         return links
 
     def get_forwardlinks(self, uuid):
-        con = self.get_connection()
-
-        cur = con.cursor()
+        connection = self.get_connection()
+        cursor = connection.cursor()
 
         # Get keywords inside this document
-        cur.execute('select key from refs where uuid = ?', (uuid,))
+        cursor.execute('SELECT key FROM refs WHERE uuid = ?', (uuid,))
 
-        rows = cur.fetchall()
+        rows = cursor.fetchall()
 
         # TODO: Can this be replaced by an IN clause?
         links = []
 
         for r in rows:
             key = r[0]
-            cur.execute('select uuid from items where key = ? and uuid != ?', (key, uuid))
-            tmp = cur.fetchone()
+            cursor.execute('SELECT uuid FROM items WHERE key = ? AND uuid != ?', (key, uuid))
+            tmp = cursor.fetchone()
             if tmp is None:
                 continue
             links.append(tmp[0])
@@ -173,13 +161,11 @@ class VPCache:
 
     # Get the keywords that appear in the document with the given UUID
     def get_links(self, uuid):
+        connection = self.get_connection()
+        cursor = connection.cursor()
 
-        con = self.get_connection()
-
-        cur = con.cursor()
-
-        cur.execute('select key, wikiword from refs where uuid = ?', (uuid,))
-        rows = cur.fetchall()
+        cursor.execute('SELECT key, wikiword FROM refs WHERE uuid = ?', (uuid,))
+        rows = cursor.fetchall()
 
         links = {}
         for r in rows:
@@ -191,17 +177,14 @@ class VPCache:
 
     # Dump tables contents to stdout
     def dump_tables(self):
-        con = self.get_connection()
+        connection = self.get_connection()
+        cursor = connection.cursor()
 
-        cur = con.cursor()
-
-        rows = cur.execute('select * from items')
-
+        rows = cursor.execute('SELECT * FROM items')
         for r in rows:
             print(r)
 
-        rows = cur.execute('select * from refs')
-
+        rows = cursor.execute('SELECT * FROM refs')
         for r in rows:
             print(r)
 
