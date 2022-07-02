@@ -120,11 +120,12 @@ class DataStore:
         ds.storeinfo = plistlib.load(open(str(storeinfo_path), 'rb'), fmt=plistlib.FMT_XML)
 
         if ds.storeinfo['isEncrypted']:
-            if ds.password == None:
-                raise Exception('Password is required for encrypted document')
-            ds.encrypted = True
-            ds.enc_ctx = vpenc.VPEncryptionContext()
-            ds.enc_ctx.load(ds.path, ds.password)
+            raise Exception('Encrypted documents are not supported')
+            # if ds.password == None:
+            #     raise Exception('Password is required for encrypted document')
+            # ds.encrypted = True
+            # ds.enc_ctx = vpenc.VPEncryptionContext()
+            # ds.enc_ctx.load(ds.path, ds.password)
 
         if ds.storeinfo['VoodooPadBundleVersion'] != 6:
             raise Exception('Unsupported')
