@@ -20,8 +20,10 @@
 # FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 # DEALINGS IN THE SOFTWARE.
 
-import sys
 import re
+import sys
+
+import mistletoe
 
 # Parses a link and moves the index forward
 # Returns link_text, link_target

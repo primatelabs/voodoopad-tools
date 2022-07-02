@@ -20,98 +20,130 @@
 # FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 # DEALINGS IN THE SOFTWARE.
 
+import argparse
+import json
 import os
-import sys
-import wikilink
-import tempfile
-import urllib.parse
+import pprint
+import re
 import subprocess
+import sys
+import tempfile
+import unicodedata
+import urllib.parse
+import xml.etree.ElementTree as ET
 
-# TODO: Is there a way to automatically find this script?
-converter_path = '/home/brichard/git/mediawiki-to-markdown/convert.php'
+from markdown_it import MarkdownIt
+from markdown_it.renderer import RendererProtocol
+import pandoc
+import requests
 
-def get_article_markdown(article_name):
 
-    file_name = wikilink.convert_link(article_name) + '.xml'
+def slugify(value):
+    """
+    Taken from https://github.com/django/django/blob/master/django/utils/text.py
+    Convert to ASCII if 'allow_unicode' is False. Convert spaces or repeated
+    dashes to single dashes. Remove characters that aren't alphanumerics,
+    underscores, or hyphens. Convert to lowercase. Also strip leading and
+    trailing whitespace, dashes, and underscores.
+    """
+    value = str(value)
+    value = unicodedata.normalize('NFKC', value)
+    value = re.sub(r'[^\w\s-]', '', value.lower())
+    return re.sub(r'[-\s]+', '-', value).strip('-_')
 
-    pwd = os.getcwd() + '/'
-    tmp_dir = pwd + 'tmp/'
 
-    # The mediawiki to markdown script does not let us specify the output file name. It only lets us specify the
-    # directory. So we create a temporary directory and output the markdown file to it. Since it will be the
-    # only file in the directory, we can read it back without knowing its name.
-    md_dir = tempfile.TemporaryDirectory()
+class Article:
+    def __init__(self, title, text):
+        self.title = title
+        self.text = text
 
-    url = 'https://en.wikipedia.org/wiki/Special:Export/{0}'.format(urllib.parse.quote(article_name))
+    @classmethod
+    def download(klass, name):
+        r = requests.get(f'https://en.wikipedia.org/wiki/Special:Export/{name}')
+        if r.status_code != 200:
+            return None
 
-    subprocess.Popen("curl -L {0} --output {1}".format(url, tmp_dir + file_name), shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT).wait()
-    subprocess.Popen('php {0} --filename={1} --format=markdown_strict --output={2}'.format(converter_path, tmp_dir + file_name, md_dir.name), shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT).wait()
+        ns = {
+            'export': 'http://www.mediawiki.org/xml/export-0.10/'
+        }
 
-    md_path = md_dir.name + '/' + os.listdir(md_dir.name)[0]
+        root = ET.fromstring(r.text)
 
-    try:
-        with open(md_path, 'rb') as f:
-            md_text = f.read().decode('utf-8')
-    except:
-        return None
+        nodes = root.findall("export:page/export:title", ns)
+        title = nodes[0].text
 
-    md_dir.cleanup()
+        nodes = root.findall("export:page/export:revision/export:text", ns)
+        text = nodes[0].text
 
-    return md_text
+        return klass(title, text)
+
+    def markdown(self):
+        document = pandoc.read(self.text, format="mediawiki")
+        return pandoc.write(document, format="gfm")
+
+    def __links(self, tokens, links):
+        for token in tokens:
+            if token.type == 'link_open':
+                links.append(token.attrs['href'])
+            if token.children != None:
+                links = self.__links(token.children, links)
+        return links
+
+    def links(self):
+        md = MarkdownIt("commonmark")
+        tokens = md.parse(self.markdown())
+        return self.__links(tokens, [])
+
+    def to_json(self):
+        return json.dumps({
+            'title': self.title,
+            'text': self.text,
+            'markdown': self.markdown()
+        }, indent=4)
+
+
+def download_article(article_name, output_dir, crawl_depth):
+    print(f'download {article_name} {crawl_depth}')
+
+    article = Article.download(article_name)
+
+    article_filename = f'{slugify(article.title)}.json'
+    article_path = os.path.join(output_dir, article_filename)
+
+    if os.path.exists(article_path):
+        return
+
+    with open(article_path, 'w') as f:
+        f.write(article.to_json())
+
+    if crawl_depth > 0:
+        links = article.links()
+        for link in links:
+            url = urllib.parse.urlparse(link)
+            if not url.scheme and not url.netloc:
+                print(url.path)
+                try:
+                    download_article(url.path, output_dir, crawl_depth - 1)
+                except:
+                    print(f'error {url.path}')
+
 
 def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('article', help='article')
+    parser.add_argument('output', help='output')
+    parser.add_argument('--crawl-depth', type=int, default=0, help='crawl depth')
 
-    # Verify converter is installed
-    if not os.path.exists(converter_path):
-        print('Error: Could not find mediawiki converter: ', converter_path)
-        return
+    args = parser.parse_args()
+    print(args)
 
-    if len(sys.argv) != 3:
-        print('Uasge: <article name> <output directory>')
-        return
+    try:
+        os.mkdir(args.output)
+    except FileExistsError:
+        pass
 
-    article_name = sys.argv[1]
-    output_dir = sys.argv[2]
+    download_article(args.article, args.output, args.crawl_depth)
 
-    os.system('mkdir -p {0}'.format(output_dir))
-    os.system('mkdir -p tmp')
-
-    article = get_article_markdown(article_name)
-
-    if article == None:
-        print('Could not find article for ', article_name)
-        return
-
-    converted_article = wikilink.convert_article(article)
-
-    file_name = output_dir + '/' + wikilink.convert_link(article_name) + '.md'
-
-    print(file_name)
-    with open(file_name, 'wt') as f:
-        f.write(converted_article)
-
-    # Get all the links from this article
-
-    links = wikilink.get_links(article)
-
-    # Download every article this one links to
-    for link in links:
-        article_name = link
-
-        try:
-            article_text = get_article_markdown(article_name)
-            if article_text == None:
-                print('Error getting article for ', article_name)
-                continue
-        except:
-            continue
-
-        converted_article = wikilink.convert_article(article_text)
-        file_name = output_dir + '/' + wikilink.convert_link(article_name) + '.md'
-
-        print(file_name)
-        with open(file_name, 'wt') as f:
-            f.write(converted_article)
 
 if __name__ == '__main__':
     main()
