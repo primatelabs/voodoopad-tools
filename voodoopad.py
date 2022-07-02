@@ -376,19 +376,6 @@ class VoodooPad:
             with open(filename, 'w') as f:
                 f.write(text)
 
-    def render_doc(self):
-        self.cache_.update_cache(self.ds_)
-
-        pages = []
-        for uuid in self.ds_.item_uuids():
-            plist = self.ds_.item_plist(uuid)
-            display_name = plist['displayName']
-            text = self.render_page(self.ds_, self.cache_, uuid)
-
-            pages.append({'display_name': display_name, 'text': text})
-
-        return pages
-
     def add_item(self, ds, name, text, format=PageFormat.Plaintext):
         for item in self.ds_.item_plists.values():
             if item['displayName'].lower() == name.lower():
