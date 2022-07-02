@@ -31,6 +31,9 @@ import xml.parsers.expat
 # Disable encryption for now
 #import vpenc
 
+import tokenizer
+from wordtrie import WordTrie
+
 def sha1_hash(s):
     sha1 = hashlib.sha1()
     sha1.update(s.encode('utf-8'))
@@ -46,6 +49,7 @@ class DataStore:
         self.properties = {}
         self.items = {}
         self.item_plists = {}
+        self.trie = None
 
     @classmethod
     def create(cls, path):
@@ -288,3 +292,10 @@ class DataStore:
 
 
       return plists
+
+    def regenerate_trie(self):
+        self.trie = WordTrie()
+        for uuid in self.item_uuids():
+            item = self.item_plist(uuid)
+            name = tokenizer.tokenize_text(item['displayName'].lower())
+            self.trie.add(name)

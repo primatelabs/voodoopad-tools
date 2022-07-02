@@ -22,6 +22,8 @@
 
 import re
 
+from wordtrie import WordTrie
+
 def is_wikiword(word):
 
     # Must be alphanumeric
@@ -46,37 +48,65 @@ def is_wikiword(word):
     return False
 
 
+def tokenize_text(text):
+    return re.split(r"[\s\r\n;,.()-]+", text)
+
+
+def lookup_name(words, start, trie):
+    best = None
+
+    current_branch = trie
+    next_branch = None
+
+    for i in range(start, len(words)):
+        next_branch = current_branch.query_word(words[i])
+        if next_branch is None:
+            break
+        if next_branch.words > 0:
+            best = i
+        current_branch = next_branch
+
+    if best is None:
+        return None
+
+    return words[start:(best + 1)]
+
+
 class VPItem:
-    def __init__(self, text, page_names):
+    def __init__(self, text, trie):
         self.tokens = []
-        self.page_names = page_names
 
-        words = re.split(r"[\s\r\n;,.()-]+", text)
+        words = tokenize_text(text)
 
-        # Find wikiwords
-        for word in words:
-            if is_wikiword(word):
-                self.tokens.append(word)
+        self.find_wikiwords(words)
 
-        # Search for page names in this page. We are dong a
-        # case-insensitive search so convert both page
-        # and names to lower-case
-        text_lower = text.lower()
-        names_lower = [x.lower() for x in page_names]
+        words = tokenize_text(text.lower())
 
-        # Find page names
-        for i in range(len(page_names)):
-            if text_lower.find(names_lower[i]) != -1:
-                self.tokens.append(page_names[i])
+        for i in range(len(words)):
+            # Check to see if the current word is at the root of the trie.
+            branch = trie.query_word(words[i])
+            if branch is None:
+                continue
+            else:
+                match = lookup_name(words, i, trie)
+                if match:
+                    self.tokens.append(' '.join(match))
 
         # Remove duplicates
         self.tokens = list(set(self.tokens))
 
+
+    def find_wikiwords(self, words):
+        for word in words:
+            if is_wikiword(word):
+                self.tokens.append(word)
+
+
     def item_keywords(self):
         return self.tokens
 
-    def read_plaintext(self, path):
 
+    def read_plaintext(self, path):
         try:
             f = open(path, 'r')
             s = f.read()

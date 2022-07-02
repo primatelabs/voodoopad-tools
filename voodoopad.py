@@ -72,6 +72,7 @@ class VPCache:
 
         cur = con.cursor()
 
+        ds.regenerate_trie()
         uuids = ds.item_uuids()
 
         updated_items = []
@@ -79,6 +80,7 @@ class VPCache:
 
         # Go through the UUIDs and check if any are new or updated
         for uuid in uuids:
+            print(uuid)
             item = ds.item_plist(uuid)
             data_hash = item['dataHash']
 
@@ -225,11 +227,8 @@ def get_page_names(ds):
 
 # Returns an array of wikiwords in the document
 def get_wikiwords(ds, uuid):
-
-    page_names = get_page_names(ds)
-
     text = ds.item(uuid)
-    item = tokenizer.VPItem(text, page_names)
+    item = tokenizer.VPItem(text, ds.trie)
 
     return item.item_keywords()
 
@@ -248,13 +247,13 @@ class VoodooPad:
     path_ = None
     password_ = None
 
-    def __init__(self, document_path = None, password = None, in_memory = False):
+    def __init__(self, document_path=None, password=None, in_memory=False):
         self.path_ = document_path
         self.password_ = password
         self.in_memory_ = in_memory
 
         if self.path_ != None:
-            self.ds_ = datastore.DataStore(self.path_, password, in_memory)
+            self.ds_ = datastore.DataStore.open(self.path_, password, in_memory)
             self.cache_ = VPCache(self.path_, self.in_memory_)
             self.cache_.update_cache(self.ds_)
 
