@@ -20,6 +20,8 @@
 # FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 # DEALINGS IN THE SOFTWARE.
 
+# flake8: noqa
+
 import argparse
 import hashlib
 import os
@@ -29,9 +31,11 @@ import tokenizer
 
 import datastore
 
+
 class PageFormat:
     Plaintext = 'public.utf8-plain-text'
     MarkDown = 'net.daringfireball.markdown'
+
 
 class VPCache:
     def __init__(self, ds_path, in_memory=False):
@@ -45,7 +49,7 @@ class VPCache:
         self.init_cache()
 
     def get_connection(self):
-        if self.conn_ == None:
+        if self.conn_ is None:
             self.conn_ = sqlite3.connect(self.db_path)
 
         return self.conn_
@@ -88,7 +92,7 @@ class VPCache:
             row = cur.fetchone()
 
             # This item does not exist. It is a new item.
-            if row == None:
+            if row is None:
                 new_items.append(uuid)
                 continue
 
@@ -121,7 +125,6 @@ class VPCache:
 
         con.commit()
 
-
     def get_backlinks(self, uuid):
 
         con = self.get_connection()
@@ -132,7 +135,7 @@ class VPCache:
 
         row = cur.fetchone()
 
-        if row == None:
+        if row is None:
             return None
 
         key = row[0]
@@ -162,7 +165,7 @@ class VPCache:
             key = r[0]
             cur.execute('select uuid from items where key = ? and uuid != ?', (key, uuid))
             tmp = cur.fetchone()
-            if tmp == None:
+            if tmp is None:
                 continue
             links.append(tmp[0])
 
@@ -185,6 +188,7 @@ class VPCache:
             links[key] = word
 
         return links
+
     # Dump tables contents to stdout
     def dump_tables(self):
         con = self.get_connection()
@@ -217,6 +221,7 @@ def get_wikiword_map(ds):
 
     return keywords
 
+
 def get_page_names(ds):
     names = []
     for uuid in ds.item_uuids():
@@ -225,12 +230,14 @@ def get_page_names(ds):
 
     return names
 
+
 # Returns an array of wikiwords in the document
 def get_wikiwords(ds, uuid):
     text = ds.item(uuid)
     item = tokenizer.VPItem(text, ds.trie)
 
     return item.item_keywords()
+
 
 # Map wiki words to page UUIDs and print the result
 def show_wikiwords(ds):
@@ -252,7 +259,7 @@ class VoodooPad:
         self.password_ = password
         self.in_memory_ = in_memory
 
-        if self.path_ != None:
+        if self.path_ is not None:
             self.ds_ = datastore.DataStore.open(self.path_, password, in_memory)
             self.cache_ = VPCache(self.path_, self.in_memory_)
             self.cache_.update_cache(self.ds_)
@@ -261,7 +268,6 @@ class VoodooPad:
         sha1 = hashlib.sha1()
         sha1.update(s.encode('utf-8'))
         return sha1.hexdigest()
-
 
     # Returns a markdown link with the given text and URL
     def markdown_link(self, text, url):
@@ -288,9 +294,9 @@ class VoodooPad:
         return False
 
     # Convert the page to markdown
-    def render_page(self, ds, cache, uuid):
+    def render_page(self, ds, cache, uuid):  # noqa: C901
 
-        p = ds.item_path(uuid)
+        # p = ds.item_path(uuid)
 
         plist = ds.item_plist(uuid)
 
@@ -352,7 +358,7 @@ class VoodooPad:
         sorted_indexes = []
 
         for k in sorted_indexes:
-            sorted_indexes.append({'index':k, 'key':indexes[k]})
+            sorted_indexes.append({'index': k, 'key': indexes[k]})
 
         offset = 0
         for s in sorted_indexes:
@@ -373,7 +379,6 @@ class VoodooPad:
                 offset = offset + len(markdown) - len(key)
 
         return text
-
 
     def render_document(self, output_dir):
 
@@ -397,7 +402,7 @@ class VoodooPad:
             display_name = plist['displayName']
             text = self.render_page(self.ds_, self.cache_, uuid)
 
-            pages.append({'display_name':display_name, 'text':text})
+            pages.append({'display_name': display_name, 'text': text})
 
         return pages
 
@@ -471,7 +476,7 @@ def main():
     vp.cache_ = VPCache(args.document, True)
     vp.cache_.update_cache(vp.ds_)
 
-    if args.command == None:
+    if args.command is None:
         vp.print_info()
     elif args.command == 'add':
         vp.add_file(args.file, args.title, args.format)
@@ -479,6 +484,7 @@ def main():
         vp.render(args.output)
     else:
         print(f'Unknown command \'{args.command}\'')
+
 
 if __name__ == '__main__':
     main()

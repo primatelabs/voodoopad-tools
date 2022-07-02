@@ -20,6 +20,8 @@
 # FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 # DEALINGS IN THE SOFTWARE.
 
+# flake8: noqa
+
 import errno
 import hashlib
 import os
@@ -29,15 +31,17 @@ import uuid as UUID
 import xml.parsers.expat
 
 # Disable encryption for now
-#import vpenc
+# import vpenc
 
 import tokenizer
 from wordtrie import WordTrie
+
 
 def sha1_hash(s):
     sha1 = hashlib.sha1()
     sha1.update(s.encode('utf-8'))
     return sha1.hexdigest()
+
 
 class DataStore:
     def __init__(self):
@@ -98,7 +102,7 @@ class DataStore:
         return ds
 
     @classmethod
-    def open(cls, path, password=None, in_memory=False):
+    def open(cls, path, password=None, in_memory=False):  # noqa: C901
         ds = cls()
 
         ds.path = Path(path)
@@ -121,7 +125,7 @@ class DataStore:
 
         if ds.storeinfo['isEncrypted']:
             raise Exception('Encrypted documents are not supported')
-            # if ds.password == None:
+            # if ds.password is None:
             #     raise Exception('Password is required for encrypted document')
             # ds.encrypted = True
             # ds.enc_ctx = vpenc.VPEncryptionContext()
@@ -138,7 +142,7 @@ class DataStore:
             raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), properties_path)
 
         ds.item_plists = {}
-        #item_plist_paths  = items_path.rglob('*.plist')
+        # item_plist_paths  = items_path.rglob('*.plist')
         item_plist_paths = ds.get_plists(items_path)
         for item_plist_path in item_plist_paths:
             # VoodooPad (or the underlying macOS libraries) may generate
@@ -245,7 +249,6 @@ class DataStore:
 
         return item_uuid
 
-
     def load_plist(self, path):
         if self.encrypted:
             return self.enc_ctx.load_plist(path)
@@ -277,22 +280,20 @@ class DataStore:
     # This is a work-around for Path.rglob('*.plist'). Path.rglob() has issues when running inside
     # Geekbench
     def get_plists(self, dir):
+        subdirs = os.listdir(str(dir))
+        plists = []
+        for s in subdirs:
+            path = str(Path(dir, s))
 
-      subdirs = os.listdir(str(dir))
-      plists = []
-      for s in subdirs:
-        path = str(Path(dir, s))
+            if not os.path.isdir(path):
+                continue
 
-        if not os.path.isdir(path):
-            continue
+            entries = os.listdir(path)
+            for e in entries:
+                if e.endswith('.plist'):
+                    plists.append(Path(path, e))
 
-        entires = os.listdir(path)
-        for e in entires:
-          if e.endswith('.plist'):
-            plists.append(Path(path, e))
-
-
-      return plists
+        return plists
 
     def regenerate_trie(self):
         self.trie = WordTrie()

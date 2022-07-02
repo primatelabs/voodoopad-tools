@@ -24,14 +24,14 @@ import json
 import argparse
 import glob
 import os
-import subprocess
 import sys
 
 parent = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 sys.path.append(parent)
 
-import datastore
-import voodoopad
+import datastore  # noqa: E402
+import voodoopad  # noqa: E402
+
 
 def main():
     parser = argparse.ArgumentParser()

@@ -24,6 +24,7 @@ import unittest
 
 from wordtrie import WordTrie
 
+
 class WordTrieTest(unittest.TestCase):
     def test_smoke(self):
         trie = WordTrie()

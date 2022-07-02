@@ -18,23 +18,12 @@
 # FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 # DEALINGS IN THE SOFTWARE.
 
-import errno
-import glob
-import hashlib
-import os
+
 from pathlib import Path
-import plistlib
+import os
 import sys
 
-import hkdf
-import hashlib
-import hmac
-from math import ceil
-import secrets
-import uuid
 import vpenc
-
-from Crypto.Cipher import AES
 
 
 def main():
@@ -46,11 +35,8 @@ def main():
     password = sys.argv[1]
     vp_path = sys.argv[2]
 
-    #path = Path(Path(), vp_path, 'vde.plist')
     ctx = vpenc.VPEncryptionContext()
     ctx.load(vp_path, password)
-
-    tags = ctx.load_plist('tags.plist')
 
     items_path = Path(vp_path, 'pages')
     items_plist_paths = items_path.rglob('*.plist')

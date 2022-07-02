@@ -23,17 +23,12 @@
 import argparse
 import json
 import os
-import pprint
 import re
-import subprocess
-import sys
-import tempfile
 import unicodedata
 import urllib.parse
 import xml.etree.ElementTree as ET
 
 from markdown_it import MarkdownIt
-from markdown_it.renderer import RendererProtocol
 import pandoc
 import requests
 
@@ -85,7 +80,7 @@ class Article:
         for token in tokens:
             if token.type == 'link_open':
                 links.append(token.attrs['href'])
-            if token.children != None:
+            if token.children is not None:
                 links = self.__links(token.children, links)
         return links
 
@@ -124,7 +119,7 @@ def download_article(article_name, output_dir, crawl_depth):
                 print(url.path)
                 try:
                     download_article(url.path, output_dir, crawl_depth - 1)
-                except:
+                except: # noqa
                     print(f'error {url.path}')
 
 

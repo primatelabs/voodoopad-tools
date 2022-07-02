@@ -22,10 +22,8 @@
 
 import re
 
-from wordtrie import WordTrie
 
 def is_wikiword(word):
-
     # Must be alphanumeric
     if not word.isalnum():
         return False
@@ -95,23 +93,20 @@ class VPItem:
         # Remove duplicates
         self.tokens = list(set(self.tokens))
 
-
     def find_wikiwords(self, words):
         for word in words:
             if is_wikiword(word):
                 self.tokens.append(word)
 
-
     def item_keywords(self):
         return self.tokens
-
 
     def read_plaintext(self, path):
         try:
             f = open(path, 'r')
             s = f.read()
-        except UnicodeDecodeError as e:
-            print('Warning: ', self.uuid, 'is not UTF-8')
+        except UnicodeDecodeError:
+            print(f'Warning: {self.uuid} is not UTF-8')
             s = ''
 
         return s

@@ -20,10 +20,11 @@
 # FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 # DEALINGS IN THE SOFTWARE.
 
+# flake8: noqa
+
 import re
 import sys
 
-import mistletoe
 
 # Parses a link and moves the index forward
 # Returns link_text, link_target
@@ -111,8 +112,10 @@ def parse_link(markdown_link, start=0):
 
     return link_text, link_target, link_size
 
+
 def is_wikilink(text):
     return text.find('"wikilink"') != -1
+
 
 # Convert a WikiLink to a markdown link
 def convert_link(text):
@@ -157,8 +160,10 @@ def parse_wikilink(text):
 
     return text
 
+
 def make_link(text, url):
     return '[{0}]({1})'.format(text, url)
+
 
 def convert_article(text):
     new_text = ''
@@ -174,7 +179,7 @@ def convert_article(text):
             # Possible link
             link = parse_link(text, idx)
 
-            if link == None:
+            if link is None:
                 idx = idx + 1
                 continue
 
@@ -218,7 +223,7 @@ def get_links(text):
             # Possible link
             link = parse_link(text, idx)
 
-            if link == None:
+            if link is None:
                 idx = idx + 1
                 continue
 
@@ -239,7 +244,6 @@ def get_links(text):
 
 
 def main():
-
     cmd = sys.argv[1]
 
     if cmd == 'convert':
