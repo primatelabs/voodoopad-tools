@@ -81,7 +81,6 @@ class VPCache:
 
         # Go through the UUIDs and check if any are new or updated
         for uuid in uuids:
-            print(uuid)
             item = ds.item_plist(uuid)
             data_hash = item['dataHash']
 
@@ -436,7 +435,6 @@ def main():
     parser.add_argument('--title', help='title')
 
     args = parser.parse_args()
-    print(args)
 
     if args.command == 'create':
         datastore.DataStore.create(args.document)
