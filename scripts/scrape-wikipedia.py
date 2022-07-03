@@ -23,8 +23,7 @@
 import argparse
 import json
 import os
-import re
-import unicodedata
+import sys
 import urllib.parse
 import xml.etree.ElementTree as ET
 
@@ -32,19 +31,10 @@ from markdown_it import MarkdownIt
 import pandoc
 import requests
 
+parent = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
+sys.path.append(parent)
 
-def slugify(value):
-    """
-    Taken from https://github.com/django/django/blob/master/django/utils/text.py
-    Convert to ASCII if 'allow_unicode' is False. Convert spaces or repeated
-    dashes to single dashes. Remove characters that aren't alphanumerics,
-    underscores, or hyphens. Convert to lowercase. Also strip leading and
-    trailing whitespace, dashes, and underscores.
-    """
-    value = str(value)
-    value = unicodedata.normalize('NFKC', value)
-    value = re.sub(r'[^\w\s-]', '', value.lower())
-    return re.sub(r'[-\s]+', '-', value).strip('-_')
+from utility import slugify  # noqa: E402
 
 
 class Article:
