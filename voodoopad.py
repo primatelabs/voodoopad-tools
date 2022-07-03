@@ -30,6 +30,8 @@ import sqlite3
 import tokenizer
 
 import datastore
+from utility import slugify
+
 
 class PageFormat:
     Plaintext = 'public.utf8-plain-text'
@@ -364,7 +366,6 @@ class VoodooPad:
         return text
 
     def render_document(self, output_dir):
-
         if not os.path.exists(output_dir):
             os.mkdir(output_dir)
 
@@ -372,8 +373,8 @@ class VoodooPad:
             plist = self.ds_.item_plist(uuid)
             display_name = plist['displayName']
             text = self.render_page(self.ds_, self.cache_, uuid)
-            filename = output_dir + '/{0}.md'.format(display_name)
-            with open(filename, 'w') as f:
+            path = os.path.join(output_dir, f'{slugify(display_name)}.md')
+            with open(path, 'w') as f:
                 f.write(text)
 
     def add_item(self, ds, name, text, format=PageFormat.Plaintext):
