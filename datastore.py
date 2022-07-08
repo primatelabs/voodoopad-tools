@@ -239,9 +239,8 @@ class DataStore:
         plist_path = Path(self.path, 'pages', item_uuid[0], item_uuid + '.plist')
 
         # Save to disk
-        if not self.in_memory:
-            self.save_plist(pl, plist_path)
-            self.save_file(text.encode('utf-8'), item_path)
+        self.save_plist(pl, plist_path)
+        self.save_file(text.encode('utf-8'), item_path)
 
         # Keep in memory
         self.items[item_uuid] = text
